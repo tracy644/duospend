@@ -1,3 +1,4 @@
+declare var process: any;
 import React, { useState, useEffect, useMemo } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, Category } from './types';

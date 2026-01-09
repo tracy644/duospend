@@ -1,3 +1,4 @@
+declare var process: any;
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
