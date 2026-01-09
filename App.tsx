@@ -1,32 +1,63 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Transaction, CategoryDefinition, UserRole, PartnerNames } from './types';
+import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, Category } from './types';
 import { analyzeSpending, parseReceipt } from './services/geminiService';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from './constants';
 
-const DEFAULT_CATEGORIES: CategoryDefinition[] = [
-  { id: '1', name: 'Food & Dining', color: '#f97316', icon: '🍔' },
-  { id: '2', name: 'Rent & Utilities', color: '#0ea5e9', icon: '🏠' },
-  { id: '3', name: 'Entertainment', color: '#8b5cf6', icon: '🎉' },
-  { id: '4', name: 'Shopping', color: '#ec4899', icon: '🛍️' },
-  { id: '5', name: 'Transport', color: '#22c55e', icon: '🚗' },
-];
+const DEFAULT_CATEGORIES: CategoryDefinition[] = Object.values(Category).map((catName, index) => ({
+  id: String(index + 1),
+  name: catName,
+  color: CATEGORY_COLORS[catName] || '#94a3b8',
+  icon: CATEGORY_ICONS[catName] || '💰'
+}));
 
 const DEFAULT_PARTNER_NAMES: PartnerNames = {
   [UserRole.PARTNER_1]: 'Partner 1',
   [UserRole.PARTNER_2]: 'Partner 2',
 };
 
-const GOOGLE_APPS_SCRIPT = `function doPost(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Log') || ss.insertSheet('Log');
-  var data = JSON.parse(e.postData.contents);
-  sheet.appendRow([new Date(), JSON.stringify(data)]);
-  return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+const GOOGLE_APPS_SCRIPT_CODE = `function doPost(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheets()[0] || ss.insertSheet();
+  const data = JSON.parse(e.postData.contents);
+  const txs = data.transactions;
+  
+  sheet.clear();
+  sheet.appendRow(["ID", "Date", "Description", "User", "Amount", "Category"]);
+  txs.forEach(t => {
+    sheet.appendRow([t.id, t.date, t.description, t.userId, t.totalAmount, t.splits[0]?.categoryName || 'Other']);
+  });
+  
+  return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheets()[0];
+  if (!sheet) return ContentService.createTextOutput(JSON.stringify({ transactions: [] })).setMimeType(ContentService.MimeType.JSON);
+  
+  const rows = sheet.getDataRange().getValues();
+  const transactions = [];
+  for (let i = 1; i < rows.length; i++) {
+    transactions.push({
+      id: rows[i][0],
+      date: rows[i][1],
+      description: rows[i][2],
+      userId: rows[i][3],
+      totalAmount: Number(rows[i][4]),
+      splits: [{ categoryName: rows[i][5], amount: Number(rows[i][4]) }]
+    });
+  }
+  return ContentService.createTextOutput(JSON.stringify({ transactions: transactions }))
+    .setMimeType(ContentService.MimeType.JSON);
 }`;
 
-const Card: React.FC<{ title: string; children: React.ReactNode; className?: string; accent?: string }> = ({ title, children, className = "", accent }) => (
-  <div className={`bg-white rounded-[32px] shadow-sm border border-slate-100 p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md ${className}`}>
+const Card: React.FC<{ title: string; children: React.ReactNode; className?: string; accent?: string; onClick?: () => void }> = ({ title, children, className = "", accent, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`bg-white rounded-[32px] shadow-sm border border-slate-100 p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md ${onClick ? 'cursor-pointer active:scale-[0.98]' : ''} ${className}`}
+  >
     {accent && <div className={`absolute top-0 left-0 w-1.5 h-full ${accent}`} />}
     <div className="mb-4">
       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{title}</h3>
@@ -35,33 +66,25 @@ const Card: React.FC<{ title: string; children: React.ReactNode; className?: str
   </div>
 );
 
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-      <div className="bg-white rounded-t-[40px] sm:rounded-[40px] w-full max-w-lg shadow-2xl overflow-hidden animate-in">
-        <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full transition-all">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div className="p-8 max-h-[80vh] overflow-y-auto no-scrollbar">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
+const ProgressBar: React.FC<{ progress: number; color: string }> = ({ progress, color }) => (
+  <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+    <div 
+      className="h-full transition-all duration-1000 ease-out rounded-full"
+      style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: color }}
+    />
+  </div>
+);
 
 const Dashboard: React.FC<{ 
   transactions: Transaction[], 
   budgets: Record<string, number>, 
   categories: CategoryDefinition[],
   partnerNames: PartnerNames,
-  onSync: () => Promise<void>,
-  isSyncing: boolean
-}> = ({ transactions, budgets, categories, partnerNames, onSync, isSyncing }) => {
+  goals: Goal[],
+  onUpdateGoal: (id: string, amount: number) => void,
+  onSettleUp: () => void,
+  isSynced: boolean
+}> = ({ transactions, budgets, categories, partnerNames, goals, onUpdateGoal, onSettleUp, isSynced }) => {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
@@ -82,99 +105,100 @@ const Dashboard: React.FC<{
   }, [monthlyTransactions, categories]);
 
   const totalSpent = monthlyTransactions.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const p1Total = monthlyTransactions.filter(t => t.userId === UserRole.PARTNER_1).reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const p2Total = monthlyTransactions.filter(t => t.userId === UserRole.PARTNER_2).reduce((acc, curr) => acc + curr.totalAmount, 0);
+  const p1Total = transactions.filter(t => t.userId === UserRole.PARTNER_1).reduce((acc, curr) => acc + curr.totalAmount, 0);
+  const p2Total = transactions.filter(t => t.userId === UserRole.PARTNER_2).reduce((acc, curr) => acc + curr.totalAmount, 0);
   
   const diff = p1Total - p2Total;
   const settlementAmount = Math.abs(diff) / 2;
-  const settlementMsg = diff > 0 
-    ? `${partnerNames[UserRole.PARTNER_2]} owes ${partnerNames[UserRole.PARTNER_1]} $${settlementAmount.toFixed(2)}`
-    : diff < 0 
-      ? `${partnerNames[UserRole.PARTNER_1]} owes ${partnerNames[UserRole.PARTNER_2]} $${settlementAmount.toFixed(2)}`
-      : "Balanced Spending ✨";
-
-  const chartData = categoryTotals.filter(t => t.value > 0);
+  const isP1Owed = diff > 0;
+  
+  const settlementMsg = diff === 0 
+    ? "Perfectly Balanced ✨" 
+    : isP1Owed 
+      ? `${partnerNames[UserRole.PARTNER_2]} owes $${settlementAmount.toFixed(2)}`
+      : `${partnerNames[UserRole.PARTNER_1]} owes $${settlementAmount.toFixed(2)}`;
 
   return (
     <div className="space-y-8 animate-in pb-10">
-      <header className="flex justify-between items-start pt-4">
+      <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Our Dashboard</p>
-          <h1 className="text-5xl font-black text-slate-900 tracking-tighter italic">DuoSpend</h1>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
-        <button 
-          onClick={onSync} 
-          disabled={isSyncing}
-          className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isSyncing ? 'bg-slate-100 text-slate-400' : 'bg-white text-slate-900 shadow-sm border border-slate-200 hover:bg-slate-50 active:scale-95'}`}
-        >
-          {isSyncing ? 'Syncing...' : 'Sync Cloud'}
-        </button>
+        <div className={`p-2 rounded-full ${isSynced ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-100 text-slate-300'}`}>
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z" />
+          </svg>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Card title="Settlement Status" accent="bg-indigo-500" className="bg-gradient-to-br from-indigo-50/50 to-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-black text-slate-900 tracking-tight leading-tight">{settlementMsg}</p>
-                <p className="text-[10px] font-bold text-slate-500 uppercase mt-2 tracking-wider italic">50/50 SPLIT TARGET</p>
+          <Card title="Shared Equity" accent="bg-indigo-500" className="bg-gradient-to-br from-indigo-50/50 to-white">
+            <div className="flex flex-col mb-4">
+              <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{settlementMsg}</span>
+              <div className="flex gap-4 mt-3">
+                <div className="text-[10px] font-bold text-slate-400 uppercase">
+                  {partnerNames[UserRole.PARTNER_1]}: <span className="text-slate-900 font-black">${p1Total.toFixed(0)}</span>
+                </div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase">
+                  {partnerNames[UserRole.PARTNER_2]}: <span className="text-slate-900 font-black">${p2Total.toFixed(0)}</span>
+                </div>
               </div>
             </div>
-          </Card>
-
-          <Card title="Monthly Combined" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-2xl">
-            <div className="text-5xl font-black text-white tracking-tighter">${totalSpent.toFixed(2)}</div>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-3">TOTAL SPENT THIS PERIOD</p>
-          </Card>
-
-          <Card title="Spending Mix" className="h-[240px] flex flex-col items-center justify-center">
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={65}
-                    paddingAngle={8}
-                    dataKey="value"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={categories.find(c => c.name === entry.name)?.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-[10px] font-black text-slate-300 uppercase">No data for chart</p>
+            {diff !== 0 && (
+              <button 
+                onClick={onSettleUp}
+                className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-100/50 px-4 py-2.5 rounded-xl hover:bg-indigo-100 transition-all active:scale-95"
+              >
+                Reset Balance
+              </button>
             )}
+          </Card>
+
+          <Card title="Monthly Combined" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-xl">
+            <div className="text-5xl font-black tracking-tighter">${totalSpent.toFixed(2)}</div>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-2">Current Spending Period</p>
+          </Card>
+
+          <Card title="Shared Savings">
+            <div className="space-y-6 py-2">
+              {goals.map(goal => (
+                <div key={goal.id} className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <div className="flex items-center">
+                      <span className="text-lg mr-2">{goal.icon}</span>
+                      <span className="text-xs font-black uppercase text-slate-900">{goal.name}</span>
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400">${goal.current} / ${goal.target}</span>
+                  </div>
+                  <ProgressBar progress={(goal.current / goal.target) * 100} color="#6366f1" />
+                </div>
+              ))}
+            </div>
           </Card>
         </div>
 
         <Card title="Budget Health">
-          <div className="space-y-5 py-2">
+          <div className="space-y-5 py-2 max-h-[500px] overflow-y-auto no-scrollbar">
             {categories.map(cat => {
               const spent = categoryTotals.find(t => t.name === cat.name)?.value || 0;
               const budget = budgets[cat.name] || 0;
-              const percent = Math.min((spent / (budget || 1)) * 100, 100) || 0;
+              const percent = Math.min((spent / (budget || 1)) * 100, 100);
               const isOver = spent > budget && budget > 0;
               
               return (
-                <div key={cat.id} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
-                    <span className="text-slate-500">{cat.icon} {cat.name}</span>
-                    <span className={isOver ? 'text-rose-500' : 'text-slate-900'}>${spent.toFixed(0)} / ${budget.toFixed(0)}</span>
+                <div key={cat.id} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base grayscale-0">{cat.icon}</span>
+                      <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider truncate max-w-[100px]">{cat.name}</span>
+                    </div>
+                    <span className={`text-[10px] font-black ${isOver ? 'text-rose-500' : 'text-slate-900'}`}>
+                      ${spent.toFixed(0)} / ${budget.toFixed(0)}
+                    </span>
                   </div>
-                  <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full transition-all duration-1000 rounded-full"
-                      style={{ width: `${percent}%`, backgroundColor: isOver ? '#ef4444' : cat.color }}
-                    />
-                  </div>
+                  <ProgressBar progress={percent} color={isOver ? '#f43f5e' : cat.color} />
                 </div>
               );
             })}
@@ -200,11 +224,20 @@ const TransactionList: React.FC<{
   const [newAmount, setNewAmount] = useState<string>('');
   const [newCat, setNewCat] = useState(categories[0]?.name || '');
 
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+    [...transactions].sort((a,b) => b.date.localeCompare(a.date)).forEach(t => {
+      const d = new Date(t.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(t);
+    });
+    return Object.entries(groups);
+  }, [transactions]);
+
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const amountNum = parseFloat(newAmount);
-    if (isNaN(amountNum) || amountNum <= 0) return alert("Enter a valid amount");
-    
+    if (isNaN(amountNum) || amountNum <= 0) return alert("Enter valid amount");
     onAdd({
       id: crypto.randomUUID(),
       description: newDesc || 'Expense',
@@ -235,8 +268,6 @@ const TransactionList: React.FC<{
           date: new Date().toISOString(),
           userId: newUser
         });
-      } else {
-        alert("Couldn't read receipt. Try a clearer photo.");
       }
       setIsScanning(false);
     };
@@ -246,70 +277,78 @@ const TransactionList: React.FC<{
   return (
     <div className="space-y-8 animate-in pb-10">
       <header className="flex justify-between items-center pt-4">
-        <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
-          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Our History</p>
-        </div>
-        <div className="flex gap-3">
-          <label className="cursor-pointer bg-white border border-slate-200 w-14 h-14 rounded-[22px] text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center shadow-sm active:scale-95">
-            <svg className={`w-6 h-6 ${isScanning ? 'animate-bounce text-indigo-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
+        <div className="flex gap-2">
+          <label className="cursor-pointer bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95">
+            <svg className={`w-5 h-5 ${isScanning ? 'animate-spin text-indigo-500' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
             </svg>
             <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
           </label>
-          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-8 rounded-[22px] font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-600 transition-all active:scale-95">
-            Log New
+          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-600 transition-all active:scale-95">
+            Log Entry
           </button>
         </div>
       </header>
 
-      <div className="space-y-4">
-        {transactions.length === 0 ? (
-          <div className="py-20 text-center text-slate-300 uppercase font-black text-[10px] tracking-widest">No entries found</div>
-        ) : [...transactions].sort((a,b) => b.date.localeCompare(a.date)).map((t) => (
-          <div key={t.id} className="bg-white p-5 rounded-[32px] border border-slate-100 flex items-center justify-between group transition-all hover:translate-x-1">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-xl grayscale group-hover:grayscale-0 transition-all">
-                {categories.find(c => c.name === t.splits[0]?.categoryName)?.icon || '💰'}
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">{t.description}</h4>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                  {new Date(t.date).toLocaleDateString()} • {partnerNames[t.userId]}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-lg font-black text-slate-900">${t.totalAmount.toFixed(2)}</span>
-              <button onClick={() => onDelete(t.id)} className="text-slate-200 hover:text-rose-500 transition-colors p-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
+      <div className="space-y-10">
+        {groupedTransactions.length === 0 ? (
+          <div className="py-20 text-center text-slate-300 uppercase font-black text-[10px] tracking-widest">No entries yet</div>
+        ) : groupedTransactions.map(([date, txs]) => (
+          <div key={date} className="space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{date}</h3>
+            <div className="space-y-3">
+              {txs.map(t => (
+                <div key={t.id} className="bg-white p-5 rounded-[28px] border border-slate-100 flex items-center justify-between group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">
+                      {categories.find(c => c.name === t.splits[0]?.categoryName)?.icon || '💰'}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm truncate max-w-[150px]">{t.description}</h4>
+                      <p className="text-[10px] font-black text-slate-400 uppercase">{partnerNames[t.userId]}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-lg font-black text-slate-900">${t.totalAmount.toFixed(2)}</span>
+                    <button onClick={() => onDelete(t.id)} className="text-slate-100 group-hover:text-rose-400 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Log Entry">
-        <form className="space-y-6" onSubmit={handleManualAdd}>
-          <div className="space-y-4">
-            <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-[20px] bg-slate-50 border-none outline-none font-bold placeholder-slate-300" placeholder="Where did you spend?" />
-            <div className="grid grid-cols-2 gap-4">
-              <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} required className="w-full px-6 py-4 rounded-[20px] bg-slate-50 border-none outline-none font-bold" />
-              <select value={newUser} onChange={e => setNewUser(e.target.value as UserRole)} className="w-full px-6 py-4 rounded-[20px] bg-slate-50 border-none outline-none font-bold appearance-none">
-                <option value={UserRole.PARTNER_1}>{partnerNames[UserRole.PARTNER_1]}</option>
-                <option value={UserRole.PARTNER_2}>{partnerNames[UserRole.PARTNER_2]}</option>
-              </select>
-            </div>
-            <div className="flex gap-4">
-              <select value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 px-6 py-4 rounded-[20px] bg-slate-50 border-none outline-none font-bold appearance-none">
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-              <input type="number" step="0.01" value={newAmount} onChange={e => setNewAmount(e.target.value)} required className="w-32 px-6 py-4 rounded-[20px] bg-slate-50 border-none outline-none font-black text-slate-900" placeholder="$0.00" />
-            </div>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl animate-in">
+            <h2 className="text-2xl font-black mb-6 tracking-tight">New Log</h2>
+            <form className="space-y-4" onSubmit={handleManualAdd}>
+              <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none font-bold" placeholder="Store Name" />
+              <div className="grid grid-cols-2 gap-4">
+                <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} required className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none font-bold" />
+                <select value={newUser} onChange={e => setNewUser(e.target.value as UserRole)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none font-bold">
+                  <option value={UserRole.PARTNER_1}>{partnerNames[UserRole.PARTNER_1]}</option>
+                  <option value={UserRole.PARTNER_2}>{partnerNames[UserRole.PARTNER_2]}</option>
+                </select>
+              </div>
+              <div className="flex gap-4">
+                <select value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none font-bold">
+                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+                <input type="number" step="0.01" value={newAmount} onChange={e => setNewAmount(e.target.value)} required className="w-24 px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none font-black text-right" placeholder="0.00" />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-black uppercase text-[10px] text-slate-400">Cancel</button>
+                <button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">Add</button>
+              </div>
+            </form>
           </div>
-          <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-transform">Confirm Log</button>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 };
@@ -317,174 +356,193 @@ const TransactionList: React.FC<{
 const Navigation: React.FC = () => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
-  const navItems = [
-    { path: '/', label: 'HOME', icon: '🏠' },
-    { path: '/transactions', label: 'FEED', icon: '📜' },
-    { path: '/ai', label: 'COACH', icon: '✨' },
-    { path: '/settings', label: 'SETUP', icon: '⚙️' },
-  ];
   return (
-    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-2xl border border-white/50 shadow-2xl rounded-[32px] p-2 flex gap-1 z-40 w-[94%] max-w-sm">
-      {navItems.map(item => (
-        <Link key={item.path} to={item.path} className={`flex-1 flex flex-col items-center gap-1.5 py-4 rounded-[24px] transition-all duration-300 ${isActive(item.path) ? 'bg-slate-900 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>
-          <span className="text-xl leading-none">{item.icon}</span>
-          <span className="text-[8px] font-black uppercase tracking-[0.2em]">{item.label}</span>
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-xl border border-white/50 shadow-2xl rounded-[32px] p-2 flex gap-1 z-40 w-[90%] max-w-sm safe-bottom">
+      {[
+        { path: '/', label: 'HOME', icon: '🏠' },
+        { path: '/transactions', label: 'FEED', icon: '📜' },
+        { path: '/ai', label: 'COACH', icon: '✨' },
+        { path: '/settings', label: 'SETUP', icon: '⚙️' },
+      ].map(item => (
+        <Link key={item.path} to={item.path} className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-[24px] transition-all duration-300 ${isActive(item.path) ? 'bg-slate-900 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>
+          <span className="text-xl">{item.icon}</span>
+          <span className="text-[8px] font-black tracking-widest">{item.label}</span>
         </Link>
       ))}
     </nav>
   );
 };
 
-const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[] }> = ({ transactions, budgets, categories }) => {
-  const [advice, setAdvice] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const getAdvice = async () => {
-    if (transactions.length === 0) return alert("Add some transactions first!");
-    setIsLoading(true);
-    try {
-      const result = await analyzeSpending(transactions, budgets, categories);
-      setAdvice(result);
-    } catch (err) {
-      alert("AI failed. Check your API key.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-8 animate-in pt-4 pb-10">
-      <header className="text-center">
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">AI Coach</h1>
-        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Smart Insights</p>
-      </header>
-      <div className="bg-slate-900 rounded-[48px] p-12 text-white shadow-2xl text-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/30 rounded-full blur-3xl -mr-32 -mt-32" />
-        <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center text-4xl mx-auto mb-8 border border-white/10">✨</div>
-        <h2 className="text-3xl font-black mb-6 tracking-tight">Financial Health Check</h2>
-        <button onClick={getAdvice} disabled={isLoading} className="bg-white text-slate-900 px-12 py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 disabled:opacity-50 transition-all active:scale-95">
-          {isLoading ? 'Thinking...' : 'Analyze Spending'}
-        </button>
-      </div>
-      {advice && (
-        <div className="bg-white rounded-[48px] p-10 border border-slate-100 shadow-xl animate-in prose prose-slate max-w-none">
-          <div className="whitespace-pre-wrap text-slate-600 leading-relaxed font-medium text-sm">{advice}</div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const App: React.FC = () => {
-  const [categories] = useState<CategoryDefinition[]>(DEFAULT_CATEGORIES);
   const [partnerNames, setPartnerNames] = useState<PartnerNames>(() => {
-    const saved = localStorage.getItem('duospend_partners');
+    const saved = localStorage.getItem('ds_partners');
     return saved ? JSON.parse(saved) : DEFAULT_PARTNER_NAMES;
   });
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('duospend_tx');
+    const saved = localStorage.getItem('ds_tx');
     return saved ? JSON.parse(saved) : [];
   });
   const [budgets, setBudgets] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('duospend_budgets');
-    return saved ? JSON.parse(saved) : { 'Food & Dining': 600, 'Rent & Utilities': 1500, 'Entertainment': 200, 'Shopping': 300, 'Transport': 150 };
+    const saved = localStorage.getItem('ds_budgets');
+    if (saved) return JSON.parse(saved);
+    const initialBudgets: Record<string, number> = {};
+    DEFAULT_CATEGORIES.forEach(cat => initialBudgets[cat.name] = 100);
+    return initialBudgets;
   });
-  const [syncUrl, setSyncUrl] = useState<string | undefined>(() => localStorage.getItem('duospend_sync_url') || undefined);
+  const [goals, setGoals] = useState<Goal[]>(() => {
+    const saved = localStorage.getItem('ds_goals');
+    return saved ? JSON.parse(saved) : [{ id: '1', name: 'Emergency Fund', target: 5000, current: 0, icon: '🛡️' }];
+  });
+  const [syncUrl, setSyncUrl] = useState<string>(() => localStorage.getItem('ds_sync_url') || '');
+  const [lastSync, setLastSync] = useState<string>(() => localStorage.getItem('ds_last_sync') || 'Never');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  useEffect(() => localStorage.setItem('duospend_tx', JSON.stringify(transactions)), [transactions]);
-  useEffect(() => localStorage.setItem('duospend_budgets', JSON.stringify(budgets)), [budgets]);
-  useEffect(() => localStorage.setItem('duospend_partners', JSON.stringify(partnerNames)), [partnerNames]);
-  useEffect(() => { if (syncUrl) localStorage.setItem('duospend_sync_url', syncUrl) }, [syncUrl]);
+  useEffect(() => localStorage.setItem('ds_partners', JSON.stringify(partnerNames)), [partnerNames]);
+  useEffect(() => localStorage.setItem('ds_tx', JSON.stringify(transactions)), [transactions]);
+  useEffect(() => localStorage.setItem('ds_budgets', JSON.stringify(budgets)), [budgets]);
+  useEffect(() => localStorage.setItem('ds_goals', JSON.stringify(goals)), [goals]);
+  useEffect(() => localStorage.setItem('ds_sync_url', syncUrl), [syncUrl]);
+  useEffect(() => localStorage.setItem('ds_last_sync', lastSync), [lastSync]);
 
   const addTransaction = (t: Transaction) => setTransactions(p => [...p, t]);
   const deleteTransaction = (id: string) => {
-    if (confirm("Permanently delete this entry?")) {
-      setTransactions(p => p.filter(t => t.id !== id));
-    }
+    if (confirm("Delete this log?")) setTransactions(p => p.filter(t => t.id !== id));
+  };
+  const updateGoal = (id: string, amount: number) => {
+    setGoals(prev => prev.map(g => g.id === id ? { ...g, current: amount } : g));
   };
 
-  const performSync = async () => {
-    if (!syncUrl) return alert("Configure your Sync URL in Setup!");
+  const handleSettleUp = () => {
+    if (!confirm("Clear balance? This creates a balancing log.")) return;
+    const p1Total = transactions.reduce((acc, curr) => curr.userId === UserRole.PARTNER_1 ? acc + curr.totalAmount : acc, 0);
+    const p2Total = transactions.reduce((acc, curr) => curr.userId === UserRole.PARTNER_2 ? acc + curr.totalAmount : acc, 0);
+    const diff = p1Total - p2Total;
+    const settleAmt = Math.abs(diff) / 2;
+    addTransaction({
+      id: crypto.randomUUID(),
+      description: 'Reset Equity',
+      date: new Date().toISOString(),
+      userId: diff > 0 ? UserRole.PARTNER_2 : UserRole.PARTNER_1,
+      totalAmount: settleAmt,
+      splits: [{ categoryName: Category.ONE_TIME, amount: settleAmt }]
+    });
+  };
+
+  const syncData = async () => {
+    if (!syncUrl) return alert("Enter your Sync URL first.");
     setIsSyncing(true);
     try {
+      // 1. Send local data
       await fetch(syncUrl, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ transactions, partners: partnerNames, budgets })
+        body: JSON.stringify({ transactions })
       });
-      alert("Sync completed successfully!");
-    } catch (e) {
-      alert("Sync failed. Check your network or Apps Script URL.");
+      // 2. Fetch latest combined data
+      const res = await fetch(syncUrl);
+      const data = await res.json();
+      if (data.transactions) {
+        setTransactions(data.transactions);
+        setLastSync(new Date().toLocaleTimeString());
+        alert("Synced successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Sync failed. Check your Web App URL and deployment settings.");
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    alert("Script copied to clipboard!");
-  };
-
   return (
     <HashRouter>
-      <div className="min-h-screen pb-40">
-        <div className="max-w-4xl mx-auto px-6 pt-10">
+      <div className="min-h-screen pb-40 px-6">
+        <div className="max-w-xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={categories} partnerNames={partnerNames} onSync={performSync} isSyncing={isSyncing} />} />
-            <Route path="/transactions" element={<TransactionList transactions={transactions} categories={categories} partnerNames={partnerNames} onAdd={addTransaction} onDelete={deleteTransaction} />} />
-            <Route path="/ai" element={<AIAdvisor transactions={transactions} budgets={budgets} categories={categories} />} />
+            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} goals={goals} onUpdateGoal={updateGoal} onSettleUp={handleSettleUp} isSynced={lastSync !== 'Never'} />} />
+            <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} onAdd={addTransaction} onDelete={deleteTransaction} />} />
+            <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} /></div>} />
             <Route path="/settings" element={
-              <div className="space-y-10 animate-in pt-4 pb-10">
-                <header>
-                  <h1 className="text-4xl font-black text-slate-900 tracking-tight">Setup</h1>
-                  <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Config & Sync</p>
-                </header>
+              <div className="space-y-10 animate-in pt-10 pb-10">
+                <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Launch Pad</h1></header>
                 
-                <section className="space-y-6">
-                  <h2 className="text-xl font-black text-slate-900">Partners</h2>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card title="Partner 1 Name" accent="bg-indigo-500">
-                      <input type="text" value={partnerNames[UserRole.PARTNER_1]} onChange={(e) => setPartnerNames({ ...partnerNames, [UserRole.PARTNER_1]: e.target.value })} className="w-full text-xl font-black text-indigo-600 bg-transparent border-none focus:ring-0 p-0" />
-                    </Card>
-                    <Card title="Partner 2 Name" accent="bg-pink-500">
-                      <input type="text" value={partnerNames[UserRole.PARTNER_2]} onChange={(e) => setPartnerNames({ ...partnerNames, [UserRole.PARTNER_2]: e.target.value })} className="w-full text-xl font-black text-pink-500 bg-transparent border-none focus:ring-0 p-0" />
-                    </Card>
-                  </div>
-                </section>
-
-                <section className="space-y-6">
-                  <h2 className="text-xl font-black text-slate-900">Monthly Targets</h2>
-                  <div className="space-y-3">
-                    {categories.map(cat => (
-                      <div key={cat.id} className="bg-white p-4 rounded-[24px] border border-slate-100 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-slate-400">{cat.icon} {cat.name}</span>
-                        <input 
-                          type="number" 
-                          value={budgets[cat.name] || 0} 
-                          onChange={(e) => setBudgets({ ...budgets, [cat.name]: parseFloat(e.target.value) || 0 })}
-                          className="w-24 bg-slate-50 px-3 py-2 rounded-xl text-right font-black text-slate-900 border-none outline-none"
-                        />
+                <section className="space-y-4">
+                  <h2 className="text-xl font-black tracking-tight">Go Live Checklist</h2>
+                  <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
+                    {[
+                      { step: 1, text: "Upload code to GitHub", done: true },
+                      { step: 2, text: "Deploy to Vercel (add API_KEY)", done: !!process.env.API_KEY },
+                      { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl },
+                      { step: 4, text: "Share URL with Partner", done: false }
+                    ].map(s => (
+                      <div key={s.step} className="flex items-center gap-4 text-white/90">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${s.done ? 'bg-emerald-500' : 'bg-white/10'}`}>
+                          {s.done ? '✓' : s.step}
+                        </div>
+                        <span className={`text-xs font-bold ${s.done ? 'opacity-50 line-through' : ''}`}>{s.text}</span>
                       </div>
                     ))}
                   </div>
                 </section>
 
-                <section className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-black text-slate-900">Cloud Sync (Optional)</h2>
-                    <button onClick={() => copyToClipboard(GOOGLE_APPS_SCRIPT)} className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700">Copy Script</button>
-                  </div>
-                  <Card title="Apps Script Webhook URL">
-                    <input type="url" value={syncUrl || ''} onChange={(e) => setSyncUrl(e.target.value)} placeholder="https://script.google.com/..." className="w-full px-6 py-4 rounded-[20px] bg-slate-50 border-none outline-none font-bold text-sm" />
+                <section className="space-y-4">
+                  <h2 className="text-xl font-black tracking-tight">Cloud Sync</h2>
+                  <Card title="Shared Database URL">
+                    <div className="space-y-4">
+                      <input 
+                        value={syncUrl} 
+                        onChange={e => setSyncUrl(e.target.value)} 
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none text-sm font-medium outline-none focus:ring-2 ring-indigo-500/10" 
+                        placeholder="https://script.google.com/..."
+                      />
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Last Sync: {lastSync}</span>
+                        <button onClick={syncData} disabled={isSyncing} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50 hover:bg-indigo-700 transition-colors">
+                          {isSyncing ? 'Linking...' : 'Sync Cloud'}
+                        </button>
+                      </div>
+                    </div>
                   </Card>
-                  <div className="bg-indigo-50 rounded-[32px] p-8 border border-indigo-100">
-                    <h3 className="text-indigo-900 font-black text-sm mb-2">Google Sheets Script</h3>
-                    <p className="text-[10px] font-bold text-indigo-400 uppercase mb-4 tracking-wider">Paste this in Extensions > Apps Script</p>
-                    <pre className="bg-slate-900 text-indigo-200 p-4 rounded-2xl text-[10px] overflow-x-auto no-scrollbar font-mono leading-relaxed select-all">
-                      {GOOGLE_APPS_SCRIPT}
-                    </pre>
+                </section>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Card title="Partner 1">
+                    <input value={partnerNames[UserRole.PARTNER_1]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_1]: e.target.value})} className="w-full text-lg font-black text-indigo-500 bg-transparent outline-none" />
+                  </Card>
+                  <Card title="Partner 2">
+                    <input value={partnerNames[UserRole.PARTNER_2]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_2]: e.target.value})} className="w-full text-lg font-black text-rose-500 bg-transparent outline-none" />
+                  </Card>
+                </div>
+
+                <section className="space-y-4">
+                  <h2 className="text-xl font-black tracking-tight">Backend Script</h2>
+                  <Card title="Apps Script (Copy Me)">
+                    <p className="text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Extension &gt; Apps Script in Sheets</p>
+                    <textarea 
+                      readOnly 
+                      value={GOOGLE_APPS_SCRIPT_CODE} 
+                      className="w-full h-32 bg-slate-50 text-slate-600 p-4 rounded-xl text-[9px] font-mono border-none focus:ring-0" 
+                    />
+                  </Card>
+                </section>
+
+                <section className="space-y-4">
+                  <h2 className="text-xl font-black tracking-tight">Budget Limits</h2>
+                  <div className="space-y-2">
+                    {DEFAULT_CATEGORIES.map(cat => (
+                      <div key={cat.id} className="bg-white px-5 py-4 rounded-2xl border border-slate-100 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{cat.icon}</span>
+                          <span className="text-[10px] font-black uppercase text-slate-500">{cat.name}</span>
+                        </div>
+                        <input 
+                          type="number" 
+                          value={budgets[cat.name] || 0} 
+                          onChange={e => setBudgets({...budgets, [cat.name]: parseFloat(e.target.value) || 0})} 
+                          className="w-20 text-right font-black outline-none bg-slate-50 px-3 py-2 rounded-lg text-sm" 
+                        />
+                      </div>
+                    ))}
                   </div>
                 </section>
               </div>
@@ -494,6 +552,41 @@ const App: React.FC = () => {
         <Navigation />
       </div>
     </HashRouter>
+  );
+};
+
+const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[] }> = ({ transactions, budgets, categories }) => {
+  const [advice, setAdvice] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const getAdvice = async () => {
+    setIsLoading(true);
+    try {
+      const result = await analyzeSpending(transactions, budgets, categories);
+      setAdvice(result);
+    } catch (err) {
+      alert("AI unreachable. Check API Key in Vercel.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in pb-10">
+      <header><h1 className="text-4xl font-black text-slate-900 tracking-tight text-center">DuoCoach</h1></header>
+      <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl relative overflow-hidden text-center">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full" />
+        <h2 className="text-2xl font-black mb-6 tracking-tight leading-tight">Ready for a spending review?</h2>
+        <button onClick={getAdvice} disabled={isLoading} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50">
+          {isLoading ? 'Crunching Numbers...' : 'Ask AI Coach'}
+        </button>
+      </div>
+      {advice && (
+        <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-xl animate-in">
+          <div className="prose prose-slate max-w-none whitespace-pre-wrap text-slate-600 font-medium text-sm leading-relaxed">{advice}</div>
+        </div>
+      )}
+    </div>
   );
 };
 

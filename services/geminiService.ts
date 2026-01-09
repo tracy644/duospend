@@ -5,22 +5,21 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]) => {
   const summary = transactions.map(t => {
-    const splitDetail = t.splits.map(s => `$${s.amount} in ${s.categoryName}`).join(', ');
-    return `${t.date}: ${t.description} - Total $${t.totalAmount} (${splitDetail})`;
+    return `${t.date}: ${t.description} - $${t.totalAmount} in ${t.splits[0]?.categoryName}`;
   }).join('\n');
   
   const budgetSummary = Object.entries(budgets).map(([cat, amt]) => `${cat}: $${amt}`).join('\n');
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: `Please analyze our data:\n\nTRANSACTIONS:\n${summary}\n\nBUDGET TARGETS:\n${budgetSummary}`,
+    contents: `Analyze this couple's shared finances:\n\nSPENDING:\n${summary}\n\nLIMITS:\n${budgetSummary}`,
     config: {
-      systemInstruction: "You are a world-class financial coach for couples. Your goal is to help them find balance in their spending and save for their future together. Be encouraging, slightly witty, and very specific about where they can cut back based on their provided data. Use Markdown for formatting.",
-      thinkingConfig: { thinkingBudget: 1000 }
+      systemInstruction: "You are 'DuoCoach', an empathetic and sharp financial advisor for couples. Your mission is to help them save for their goals without ruining their fun. Provide 3 actionable tips. One tip must focus on balancing their shared contributions. Be concise, warm, and use emojis.",
+      thinkingConfig: { thinkingBudget: 500 }
     },
   });
 
-  return response.text || "I couldn't generate a response. Please check your spending data.";
+  return response.text || "I couldn't crunch the numbers. Try adding more transactions!";
 };
 
 export const parseReceipt = async (base64Image: string, categories: CategoryDefinition[]): Promise<{amount: number, description: string, categoryName: string} | null> => {
@@ -32,11 +31,11 @@ export const parseReceipt = async (base64Image: string, categories: CategoryDefi
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-          { text: "Extract total, merchant, and category." }
+          { text: "Extract receipt details." }
         ]
       },
       config: {
-        systemInstruction: `Extract data from receipt images. You must categorize the receipt into one of these: [${catList}]. Return the data in valid JSON format.`,
+        systemInstruction: `Return JSON: { "amount": number, "description": string, "categoryName": string }. Categories: [${catList}].`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -53,7 +52,7 @@ export const parseReceipt = async (base64Image: string, categories: CategoryDefi
     if (!response.text) return null;
     return JSON.parse(response.text.trim());
   } catch (error) {
-    console.error("Gemini Receipt Parsing Error:", error);
+    console.error("Scanning Error:", error);
     return null;
   }
 };

@@ -1,39 +1,30 @@
+# DuoSpend - Online Deployment Guide
 
-# DuoSpend - Shared Finance Tracker
+Follow these steps to get your shared app running online for you and your girlfriend.
 
-A collaborative spending tracker for couples, featuring Google Sheets sync and AI insights via Gemini.
+## Step 1: Deploy the App (Frontend)
+1. Push this code to a **GitHub** repository.
+2. Sign up/Login to [Vercel](https://vercel.com).
+3. Import your repository and click **Deploy**.
+4. **Important**: Go to Project Settings > Environment Variables and add `API_KEY` with your Gemini API key.
+5. You now have a public URL (e.g., `duospend.vercel.app`) to share!
 
-## Local Setup
-
-1. **Prerequisites**: Ensure you have [Node.js](https://nodejs.org/) installed.
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Environment Variables**:
-   Create a `.env` file in the root and add your Gemini API Key:
-   ```env
-   VITE_API_KEY=your_gemini_api_key_here
-   ```
-4. **Run Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-## Google Sheets Sync Setup
-
-1. Open a new [Google Sheet](https://sheets.new).
+## Step 2: Setup the Database (Google Sheets)
+1. Create a new [Google Sheet](https://sheets.new).
 2. Go to **Extensions > Apps Script**.
-3. Copy the code from the **Settings** tab in the app and paste it into the script editor.
-4. Click **Deploy > New Deployment**.
-5. Select **Type: Web App**.
-6. Set **Execute as: Me** and **Who has access: Anyone**.
-7. Copy the **Web App URL** and paste it into the "Sync URL" field in the DuoSpend Settings tab.
+3. In your DuoSpend app (on the web), go to the **Setup** tab and copy the code from the **Technical Setup** card.
+4. Paste it into the Apps Script editor and Save.
+5. Click **Deploy > New Deployment**.
+   - Type: **Web App**
+   - Execute as: **Me**
+   - Who has access: **Anyone** (This is crucial for mobile sync).
+6. Copy the **Web App URL**.
 
-## Deployment (Vercel/Netlify)
+## Step 3: Connect
+1. Paste the **Web App URL** from Step 2 into the "Sync URL" field in your DuoSpend Setup tab.
+2. Click **Sync Now**.
+3. Both you and your girlfriend should now use the same Vercel URL and the same Sync URL in your settings.
 
-1. Upload this folder to a GitHub repository.
-2. Connect the repository to [Vercel](https://vercel.com).
-3. In the Vercel dashboard, go to **Settings > Environment Variables**.
-4. Add a key named `API_KEY` with your Gemini API key as the value.
-5. Deploy!
+---
+
+*Tip: For the best experience, open the URL in Safari (iOS) or Chrome (Android) and "Add to Home Screen" to use it like a native app.*
