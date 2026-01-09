@@ -16,6 +16,7 @@ export const analyzeSpending = async (transactions: Transaction[], budgets: Reco
     contents: `Please analyze our data:\n\nTRANSACTIONS:\n${summary}\n\nBUDGET TARGETS:\n${budgetSummary}`,
     config: {
       systemInstruction: "You are a world-class financial coach for couples. Your goal is to help them find balance in their spending and save for their future together. Be encouraging, slightly witty, and very specific about where they can cut back based on their provided data. Use Markdown for formatting.",
+      thinkingConfig: { thinkingBudget: 1000 }
     },
   });
 
