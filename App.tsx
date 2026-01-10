@@ -39,7 +39,6 @@ function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   const txs = data.transactions;
   
-  // Clear and rewrite with the most up-to-date shared list
   sheet.clear();
   sheet.appendRow(["ID", "Date", "Description", "User", "Amount", "Category"]);
   
@@ -66,9 +65,8 @@ function doGet() {
   const rows = sheet.getDataRange().getValues();
   const transactions = [];
   
-  // Skip header row
   for (let i = 1; i < rows.length; i++) {
-    if (!rows[i][0]) continue; // Skip empty rows
+    if (!rows[i][0]) continue;
     transactions.push({
       id: String(rows[i][0]),
       date: rows[i][1],
@@ -489,26 +487,23 @@ const App: React.FC = () => {
     if (!syncUrl) return alert("Enter your Sync URL first.");
     setIsSyncing(true);
     try {
-      // Step 1: Push current state to Cloud
       await fetch(syncUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ transactions })
       });
       
-      // Step 2: Fetch the unified state back from Cloud
       const res = await fetch(syncUrl);
       const data = await res.json();
       
       if (data.transactions) {
-        // Simple merge: prefer IDs from cloud
         setTransactions(data.transactions);
         setLastSync(new Date().toLocaleTimeString());
-        alert("Cloud Sync Complete! You and your partner are now aligned.");
+        alert("Cloud Sync Complete!");
       }
     } catch (err) {
       console.error(err);
-      alert("Sync failed. Ensure your Google Apps Script is deployed as a Web App to 'Anyone'.");
+      alert("Sync failed. Check your Apps Script deployment settings.");
     } finally {
       setIsSyncing(false);
     }
@@ -566,12 +561,6 @@ const App: React.FC = () => {
                       <span className="text-xs font-bold">Injected API Key:</span>
                       <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${isAIEnabled ? 'bg-emerald-500' : 'bg-rose-500'}`}>
                         {isAIEnabled ? 'READY' : 'NOT DETECTED'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-white/90">
-                      <span className="text-xs font-bold">Cloud Sync Status:</span>
-                      <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${!!syncUrl ? 'bg-indigo-500' : 'bg-slate-700'}`}>
-                        {!!syncUrl ? 'CONNECTED' : 'DISCONNECTED'}
                       </span>
                     </div>
                   </div>
@@ -637,26 +626,6 @@ const App: React.FC = () => {
                     <Card title="Partner 2">
                       <input value={partnerNames[UserRole.PARTNER_2]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_2]: e.target.value})} className="w-full text-lg font-black text-rose-500 bg-transparent outline-none" />
                     </Card>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <h2 className="text-xl font-black tracking-tight">Budget Limits</h2>
-                  <div className="space-y-2">
-                    {DEFAULT_CATEGORIES.map(cat => (
-                      <div key={cat.id} className="bg-white px-5 py-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{cat.icon}</span>
-                          <span className="text-[10px] font-black uppercase text-slate-500">{cat.name}</span>
-                        </div>
-                        <input 
-                          type="number" 
-                          value={budgets[cat.name] || 0} 
-                          onChange={e => setBudgets({...budgets, [cat.name]: parseFloat(e.target.value) || 0})} 
-                          className="w-20 text-right font-black outline-none bg-slate-50 px-3 py-2 rounded-lg text-sm" 
-                        />
-                      </div>
-                    ))}
                   </div>
                 </section>
               </div>
