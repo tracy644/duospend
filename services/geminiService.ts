@@ -2,7 +2,6 @@ declare var process: any;
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
-// Lazy initialize to prevent top-level crashes if key is missing
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   
@@ -20,9 +19,7 @@ const getAIClient = () => {
 
 export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]) => {
   const ai = getAIClient();
-  if (!ai) {
-    return "AI Coaching is unavailable because the API_KEY is not set correctly.";
-  }
+  if (!ai) return "API Key not found in current build.";
 
   const summary = transactions.map(t => {
     return `${t.date}: ${t.description} - $${t.totalAmount} in ${t.splits[0]?.categoryName}`;
@@ -35,15 +32,12 @@ export const analyzeSpending = async (transactions: Transaction[], budgets: Reco
       model: 'gemini-3-pro-preview',
       contents: `Analyze this couple's shared finances:\n\nSPENDING:\n${summary}\n\nLIMITS:\n${budgetSummary}`,
       config: {
-        systemInstruction: "You are 'DuoCoach', an empathetic and sharp financial advisor for couples. Your mission is to help them save for their goals without ruining their fun. Provide 3 actionable tips. One tip must focus on balancing their shared contributions. Be concise, warm, and use emojis.",
-        thinkingConfig: { thinkingBudget: 500 }
+        systemInstruction: "You are 'DuoCoach', a Sharp financial advisor for couples. Help them save. Provide 3 actionable tips. Be concise, warm, and use emojis.",
       },
     });
-
-    return response.text || "I couldn't crunch the numbers. Try adding more transactions!";
+    return response.text || "No insights found.";
   } catch (err) {
-    console.error("AI Generation Error:", err);
-    return "The AI Coach is currently having trouble thinking. Please check your connection.";
+    return "Error connecting to AI Coach.";
   }
 };
 
@@ -76,11 +70,9 @@ export const parseReceipt = async (base64Image: string, categories: CategoryDefi
         }
       }
     });
-
     if (!response.text) return null;
     return JSON.parse(response.text.trim());
   } catch (error) {
-    console.error("Scanning Error:", error);
     return null;
   }
 };
