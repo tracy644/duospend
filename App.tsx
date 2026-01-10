@@ -84,8 +84,9 @@ const Dashboard: React.FC<{
   goals: Goal[],
   onUpdateGoal: (id: string, amount: number) => void,
   onSettleUp: () => void,
-  isSynced: boolean
-}> = ({ transactions, budgets, categories, partnerNames, goals, onUpdateGoal, onSettleUp, isSynced }) => {
+  isSynced: boolean,
+  lastSync: string
+}> = ({ transactions, budgets, categories, partnerNames, goals, onUpdateGoal, onSettleUp, isSynced, lastSync }) => {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
@@ -126,10 +127,13 @@ const Dashboard: React.FC<{
           <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
-        <div className={`p-2 rounded-full ${isSynced ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-100 text-slate-300'}`}>
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z" />
-          </svg>
+        <div className="flex flex-col items-end">
+          <div className={`p-2 rounded-full mb-1 ${isSynced ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-100 text-slate-300'}`}>
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z" />
+            </svg>
+          </div>
+          <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{isSynced ? `Synced ${lastSync}` : 'Offline'}</span>
         </div>
       </header>
 
@@ -455,12 +459,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+    alert("Script copied to clipboard!");
+  };
+
   return (
     <HashRouter>
       <div className="min-h-screen pb-40 px-6">
         <div className="max-w-xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} goals={goals} onUpdateGoal={updateGoal} onSettleUp={handleSettleUp} isSynced={lastSync !== 'Never'} />} />
+            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} goals={goals} onUpdateGoal={updateGoal} onSettleUp={handleSettleUp} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
             <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} onAdd={addTransaction} onDelete={deleteTransaction} />} />
             <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} /></div>} />
             <Route path="/settings" element={
@@ -471,10 +480,10 @@ const App: React.FC = () => {
                   <h2 className="text-xl font-black tracking-tight">Go Live Checklist</h2>
                   <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
                     {[
-                      { step: 1, text: "Upload code to GitHub", done: true },
-                      { step: 2, text: "Deploy to Vercel (add API_KEY)", done: !!process.env.API_KEY },
-                      { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl },
-                      { step: 4, text: "Share URL with Partner", done: false }
+                      { step: 1, text: "Deploy to Vercel (Done)", done: true },
+                      { step: 2, text: "Verify API_KEY in Environment", done: !!process.env.API_KEY },
+                      { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl && syncUrl.includes('google.com') },
+                      { step: 4, text: "Personalize Partner Names", done: partnerNames[UserRole.PARTNER_1] !== 'Partner 1' || partnerNames[UserRole.PARTNER_2] !== 'Partner 2' }
                     ].map(s => (
                       <div key={s.step} className="flex items-center gap-4 text-white/90">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${s.done ? 'bg-emerald-500' : 'bg-white/10'}`}>
@@ -516,8 +525,11 @@ const App: React.FC = () => {
                 </div>
 
                 <section className="space-y-4">
-                  <h2 className="text-xl font-black tracking-tight">Backend Script</h2>
-                  <Card title="Apps Script (Copy Me)">
+                  <div className="flex justify-between items-end px-2">
+                    <h2 className="text-xl font-black tracking-tight">Backend Script</h2>
+                    <button onClick={handleCopyCode} className="text-[9px] font-black uppercase bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 mb-1 active:scale-95 transition-all">Copy Code</button>
+                  </div>
+                  <Card title="Apps Script (Instructions Inside)">
                     <p className="text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Extension &gt; Apps Script in Sheets</p>
                     <textarea 
                       readOnly 
