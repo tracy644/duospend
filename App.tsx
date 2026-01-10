@@ -228,8 +228,9 @@ const TransactionList: React.FC<{
   categories: CategoryDefinition[],
   partnerNames: PartnerNames,
   onAdd: (t: Transaction) => void,
-  onDelete: (id: string) => void
-}> = ({ transactions, categories, partnerNames, onAdd, onDelete }) => {
+  onDelete: (id: string) => void,
+  isAIEnabled: boolean
+}> = ({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [newDesc, setNewDesc] = useState('');
@@ -266,6 +267,10 @@ const TransactionList: React.FC<{
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAIEnabled) {
+      alert("Receipt scanning requires an API Key. Please configure it in your Vercel settings.");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     setIsScanning(true);
@@ -293,11 +298,11 @@ const TransactionList: React.FC<{
       <header className="flex justify-between items-center pt-4">
         <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
         <div className="flex gap-2">
-          <label className="cursor-pointer bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95">
+          <label className={`cursor-pointer bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95 ${!isAIEnabled ? 'opacity-50' : ''}`}>
             <svg className={`w-5 h-5 ${isScanning ? 'animate-spin text-indigo-500' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
             </svg>
-            <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+            <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={!isAIEnabled} />
           </label>
           <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-600 transition-all active:scale-95">
             Log Entry
@@ -493,27 +498,28 @@ const App: React.FC = () => {
     }
   };
 
-  // Safely check for API Key without crashing
+  // Safe check for the API key to avoid crashing the whole React app
   const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : null;
-  const isApiKeyConfigured = apiKey && apiKey !== 'undefined';
+  const isAIEnabled = !!(apiKey && apiKey !== 'undefined' && apiKey !== '');
 
   return (
     <HashRouter>
       <div className="min-h-screen pb-40 px-6">
         <div className="max-w-xl mx-auto">
-          {!isApiKeyConfigured && (
+          {!isAIEnabled && (
             <div className="mt-10 p-6 bg-rose-50 border border-rose-100 rounded-[32px] text-rose-800 animate-in">
-              <h2 className="text-lg font-black uppercase tracking-tighter mb-2">Configuration Warning</h2>
+              <h2 className="text-lg font-black uppercase tracking-tighter mb-2">Setup Required</h2>
               <p className="text-sm font-medium leading-relaxed">
-                The <code className="bg-rose-100 px-1 rounded">API_KEY</code> environment variable is missing in Vercel. 
-                Features like <strong>Receipt Scanning</strong> and <strong>AI Coaching</strong> will be disabled until fixed.
+                The <code className="bg-rose-100 px-1 rounded">API_KEY</code> is missing. 
+                Receipt scanning and AI coaching are currently disabled. 
+                Add it to your Vercel project settings to enable them.
               </p>
             </div>
           )}
           <Routes>
             <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} goals={goals} onUpdateGoal={updateGoal} onSettleUp={handleSettleUp} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
-            <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} onAdd={addTransaction} onDelete={deleteTransaction} />} />
-            <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} isEnabled={isApiKeyConfigured} /></div>} />
+            <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} onAdd={addTransaction} onDelete={deleteTransaction} isAIEnabled={isAIEnabled} />} />
+            <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} isEnabled={isAIEnabled} /></div>} />
             <Route path="/settings" element={
               <div className="space-y-10 animate-in pt-10 pb-10">
                 <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Launch Pad</h1></header>
@@ -523,7 +529,7 @@ const App: React.FC = () => {
                   <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
                     {[
                       { step: 1, text: "Deploy to Vercel (Done)", done: true },
-                      { step: 2, text: "Verify API_KEY in Environment", done: !!isApiKeyConfigured },
+                      { step: 2, text: "Verify API_KEY in Environment", done: isAIEnabled },
                       { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl && syncUrl.includes('google.com') },
                       { step: 4, text: "Personalize Partner Names", done: partnerNames[UserRole.PARTNER_1] !== 'Partner 1' || partnerNames[UserRole.PARTNER_2] !== 'Partner 2' }
                     ].map(s => (
@@ -615,7 +621,10 @@ const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string,
   const [isLoading, setIsLoading] = useState(false);
 
   const getAdvice = async () => {
-    if (!isEnabled) return alert("AI Coaching is currently disabled. Check the Configuration Warning on the Home tab.");
+    if (!isEnabled) {
+      alert("AI Coaching is unavailable. Please check the Configuration Warning on the Home tab.");
+      return;
+    }
     setIsLoading(true);
     try {
       const result = await analyzeSpending(transactions, budgets, categories);

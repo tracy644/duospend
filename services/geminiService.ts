@@ -2,40 +2,59 @@ declare var process: any;
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
-// Lazy initialize to prevent top-level crashes
+// Lazy initialize to prevent top-level crashes if key is missing
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'undefined') {
-    throw new Error("API Key is missing. Please set API_KEY in your environment variables.");
+  
+  // Robust check for missing or 'undefined' string keys from Vite
+  if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    return null;
   }
-  return new GoogleGenAI({ apiKey });
+  
+  try {
+    return new GoogleGenAI({ apiKey });
+  } catch (e) {
+    console.error("Failed to initialize GoogleGenAI:", e);
+    return null;
+  }
 };
 
 export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]) => {
+  const ai = getAIClient();
+  if (!ai) {
+    return "AI Coaching is unavailable because the API_KEY is not set in environment variables.";
+  }
+
   const summary = transactions.map(t => {
     return `${t.date}: ${t.description} - $${t.totalAmount} in ${t.splits[0]?.categoryName}`;
   }).join('\n');
   
   const budgetSummary = Object.entries(budgets).map(([cat, amt]) => `${cat}: $${amt}`).join('\n');
   
-  const ai = getAIClient();
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Analyze this couple's shared finances:\n\nSPENDING:\n${summary}\n\nLIMITS:\n${budgetSummary}`,
-    config: {
-      systemInstruction: "You are 'DuoCoach', an empathetic and sharp financial advisor for couples. Your mission is to help them save for their goals without ruining their fun. Provide 3 actionable tips. One tip must focus on balancing their shared contributions. Be concise, warm, and use emojis.",
-      thinkingConfig: { thinkingBudget: 500 }
-    },
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Analyze this couple's shared finances:\n\nSPENDING:\n${summary}\n\nLIMITS:\n${budgetSummary}`,
+      config: {
+        systemInstruction: "You are 'DuoCoach', an empathetic and sharp financial advisor for couples. Your mission is to help them save for their goals without ruining their fun. Provide 3 actionable tips. One tip must focus on balancing their shared contributions. Be concise, warm, and use emojis.",
+        thinkingConfig: { thinkingBudget: 500 }
+      },
+    });
 
-  return response.text || "I couldn't crunch the numbers. Try adding more transactions!";
+    return response.text || "I couldn't crunch the numbers. Try adding more transactions!";
+  } catch (err) {
+    console.error("AI Generation Error:", err);
+    return "The AI Coach is currently having trouble thinking. Please check your connection.";
+  }
 };
 
 export const parseReceipt = async (base64Image: string, categories: CategoryDefinition[]): Promise<{amount: number, description: string, categoryName: string} | null> => {
+  const ai = getAIClient();
+  if (!ai) return null;
+
   const catList = categories.map(c => c.name).join(', ');
   
   try {
-    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
