@@ -5,7 +5,6 @@ import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, Category
 import { analyzeSpending, parseReceipt } from './services/geminiService';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from './constants';
 
-// Helper to generate IDs safely across all browsers
 const generateId = () => {
   try {
     return crypto.randomUUID();
@@ -268,7 +267,7 @@ const TransactionList: React.FC<{
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAIEnabled) {
-      alert("Receipt scanning requires an API Key. Please configure it in your Vercel settings.");
+      alert("Receipt scanning requires an API Key. Ensure you have added API_KEY to Vercel and REDEPLOYED.");
       return;
     }
     const file = e.target.files?.[0];
@@ -498,9 +497,10 @@ const App: React.FC = () => {
     }
   };
 
-  // Safe check for the API key to avoid crashing the whole React app
-  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : null;
-  const isAIEnabled = !!(apiKey && apiKey !== 'undefined' && apiKey !== '');
+  // Robust check for the API key to avoid crashing the whole React app
+  // Vite replaces process.env.API_KEY with a string literal or "undefined" during build
+  const apiKeyRaw = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  const isAIEnabled = !!(apiKeyRaw && apiKeyRaw !== 'undefined' && apiKeyRaw.length > 5);
 
   return (
     <HashRouter>
@@ -510,9 +510,9 @@ const App: React.FC = () => {
             <div className="mt-10 p-6 bg-rose-50 border border-rose-100 rounded-[32px] text-rose-800 animate-in">
               <h2 className="text-lg font-black uppercase tracking-tighter mb-2">Setup Required</h2>
               <p className="text-sm font-medium leading-relaxed">
-                The <code className="bg-rose-100 px-1 rounded">API_KEY</code> is missing. 
-                Receipt scanning and AI coaching are currently disabled. 
-                Add it to your Vercel project settings to enable them.
+                The <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> is currently missing or invalid. 
+                Receipt scanning and AI coaching are disabled. 
+                <strong>To fix:</strong> Add <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> to Vercel Environment Variables and click <strong>Redeploy</strong>.
               </p>
             </div>
           )}
@@ -541,6 +541,16 @@ const App: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </section>
+
+                <section className="space-y-4">
+                  <h2 className="text-xl font-black tracking-tight">Diagnostic</h2>
+                  <Card title="Configuration Status">
+                    <div className="space-y-2 text-[10px] font-mono text-slate-500 uppercase font-bold">
+                      <div className="flex justify-between"><span>API_KEY Propagated:</span> <span className={isAIEnabled ? 'text-emerald-500' : 'text-rose-500'}>{isAIEnabled ? 'YES' : 'NO'}</span></div>
+                      <div className="flex justify-between"><span>Runtime Environment:</span> <span>{typeof process !== 'undefined' ? 'BROWSER/VITE' : 'UNKNOWN'}</span></div>
+                    </div>
+                  </Card>
                 </section>
 
                 <section className="space-y-4">
@@ -622,7 +632,7 @@ const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string,
 
   const getAdvice = async () => {
     if (!isEnabled) {
-      alert("AI Coaching is unavailable. Please check the Configuration Warning on the Home tab.");
+      alert("AI Coaching is unavailable. Ensure you have added API_KEY to Vercel and REDEPLOYED.");
       return;
     }
     setIsLoading(true);
