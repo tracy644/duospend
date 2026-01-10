@@ -1,0 +1,17 @@
+{
+  "name": "DuoSpend Shared Tracker",
+  "short_name": "DuoSpend",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "description": "Shared expense tracking for couples.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2489/2489756.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

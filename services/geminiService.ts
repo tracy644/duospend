@@ -1,12 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
-// Note: process.env.API_KEY is replaced by Vite at build time.
 const getAIClient = () => {
-  const apiKey = (process.env as any).API_KEY;
+  // Vite replaces the token process.env.API_KEY with the actual value from Vercel during build
+  const apiKey = process.env.API_KEY;
   
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-    console.error("Gemini API Key is missing. Check Vercel Environment Variables.");
     return null;
   }
   
