@@ -5,6 +5,15 @@ import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, Category
 import { analyzeSpending, parseReceipt } from './services/geminiService';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from './constants';
 
+// Helper to generate IDs safely across all browsers
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
+};
+
 const DEFAULT_CATEGORIES: CategoryDefinition[] = Object.values(Category).map((catName, index) => ({
   id: String(index + 1),
   name: catName,
@@ -244,7 +253,7 @@ const TransactionList: React.FC<{
     const amountNum = parseFloat(newAmount);
     if (isNaN(amountNum) || amountNum <= 0) return alert("Enter valid amount");
     onAdd({
-      id: crypto.randomUUID(),
+      id: generateId(),
       description: newDesc || 'Expense',
       date: new Date(newDate).toISOString(),
       userId: newUser,
@@ -266,7 +275,7 @@ const TransactionList: React.FC<{
       const parsed = await parseReceipt(base64, categories);
       if (parsed) {
         onAdd({
-          id: crypto.randomUUID(),
+          id: generateId(),
           totalAmount: parsed.amount,
           description: parsed.description,
           splits: [{ categoryName: parsed.categoryName, amount: parsed.amount }],
@@ -380,23 +389,41 @@ const Navigation: React.FC = () => {
 
 const App: React.FC = () => {
   const [partnerNames, setPartnerNames] = useState<PartnerNames>(() => {
-    const saved = localStorage.getItem('ds_partners');
-    return saved ? JSON.parse(saved) : DEFAULT_PARTNER_NAMES;
+    try {
+      const saved = localStorage.getItem('ds_partners');
+      return saved ? JSON.parse(saved) : DEFAULT_PARTNER_NAMES;
+    } catch (e) {
+      return DEFAULT_PARTNER_NAMES;
+    }
   });
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('ds_tx');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('ds_tx');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
   const [budgets, setBudgets] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('ds_budgets');
-    if (saved) return JSON.parse(saved);
-    const initialBudgets: Record<string, number> = {};
-    DEFAULT_CATEGORIES.forEach(cat => initialBudgets[cat.name] = 100);
-    return initialBudgets;
+    try {
+      const saved = localStorage.getItem('ds_budgets');
+      if (saved) return JSON.parse(saved);
+      const initialBudgets: Record<string, number> = {};
+      DEFAULT_CATEGORIES.forEach(cat => initialBudgets[cat.name] = 100);
+      return initialBudgets;
+    } catch (e) {
+      const initialBudgets: Record<string, number> = {};
+      DEFAULT_CATEGORIES.forEach(cat => initialBudgets[cat.name] = 100);
+      return initialBudgets;
+    }
   });
   const [goals, setGoals] = useState<Goal[]>(() => {
-    const saved = localStorage.getItem('ds_goals');
-    return saved ? JSON.parse(saved) : [{ id: '1', name: 'Emergency Fund', target: 5000, current: 0, icon: '🛡️' }];
+    try {
+      const saved = localStorage.getItem('ds_goals');
+      return saved ? JSON.parse(saved) : [{ id: '1', name: 'Emergency Fund', target: 5000, current: 0, icon: '🛡️' }];
+    } catch (e) {
+      return [{ id: '1', name: 'Emergency Fund', target: 5000, current: 0, icon: '🛡️' }];
+    }
   });
   const [syncUrl, setSyncUrl] = useState<string>(() => localStorage.getItem('ds_sync_url') || '');
   const [lastSync, setLastSync] = useState<string>(() => localStorage.getItem('ds_last_sync') || 'Never');
@@ -424,7 +451,7 @@ const App: React.FC = () => {
     const diff = p1Total - p2Total;
     const settleAmt = Math.abs(diff) / 2;
     addTransaction({
-      id: crypto.randomUUID(),
+      id: generateId(),
       description: 'Reset Equity',
       date: new Date().toISOString(),
       userId: diff > 0 ? UserRole.PARTNER_2 : UserRole.PARTNER_1,
@@ -437,13 +464,11 @@ const App: React.FC = () => {
     if (!syncUrl) return alert("Enter your Sync URL first.");
     setIsSyncing(true);
     try {
-      // 1. Send local data
       await fetch(syncUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ transactions })
       });
-      // 2. Fetch latest combined data
       const res = await fetch(syncUrl);
       const data = await res.json();
       if (data.transactions) {
@@ -460,9 +485,15 @@ const App: React.FC = () => {
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
-    alert("Script copied to clipboard!");
+    try {
+      navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+      alert("Script copied to clipboard!");
+    } catch (e) {
+      alert("Failed to copy. Please manually select the text.");
+    }
   };
+
+  const apiKeyExists = typeof process !== 'undefined' && process.env && process.env.API_KEY && process.env.API_KEY !== 'undefined';
 
   return (
     <HashRouter>
@@ -481,7 +512,7 @@ const App: React.FC = () => {
                   <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
                     {[
                       { step: 1, text: "Deploy to Vercel (Done)", done: true },
-                      { step: 2, text: "Verify API_KEY in Environment", done: !!process.env.API_KEY },
+                      { step: 2, text: "Verify API_KEY in Environment", done: !!apiKeyExists },
                       { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl && syncUrl.includes('google.com') },
                       { step: 4, text: "Personalize Partner Names", done: partnerNames[UserRole.PARTNER_1] !== 'Partner 1' || partnerNames[UserRole.PARTNER_2] !== 'Partner 2' }
                     ].map(s => (
