@@ -24,16 +24,34 @@ const DEFAULT_PARTNER_NAMES: PartnerNames = {
   [UserRole.PARTNER_2]: 'Partner 2',
 };
 
-const GOOGLE_APPS_SCRIPT_CODE = `function doPost(e) {
+const GOOGLE_APPS_SCRIPT_CODE = `/**
+ * DuoSpend Cloud Sync Script
+ * 1. Create a Google Sheet.
+ * 2. Extensions > Apps Script.
+ * 3. Paste this code.
+ * 4. Deploy > New Deployment > Web App.
+ * 5. Access: "Anyone".
+ */
+
+function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheets()[0] || ss.insertSheet();
+  const sheet = ss.getSheets()[0] || ss.insertSheet("Transactions");
   const data = JSON.parse(e.postData.contents);
   const txs = data.transactions;
   
+  // Clear and rewrite with the most up-to-date shared list
   sheet.clear();
   sheet.appendRow(["ID", "Date", "Description", "User", "Amount", "Category"]);
+  
   txs.forEach(t => {
-    sheet.appendRow([t.id, t.date, t.description, t.userId, t.totalAmount, t.splits[0]?.categoryName || 'Other']);
+    sheet.appendRow([
+      t.id, 
+      t.date, 
+      t.description, 
+      t.userId, 
+      t.totalAmount, 
+      t.splits[0]?.categoryName || 'Other'
+    ]);
   });
   
   return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
@@ -47,9 +65,12 @@ function doGet() {
   
   const rows = sheet.getDataRange().getValues();
   const transactions = [];
+  
+  // Skip header row
   for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue; // Skip empty rows
     transactions.push({
-      id: rows[i][0],
+      id: String(rows[i][0]),
       date: rows[i][1],
       description: rows[i][2],
       userId: rows[i][3],
@@ -57,6 +78,7 @@ function doGet() {
       splits: [{ categoryName: rows[i][5], amount: Number(rows[i][4]) }]
     });
   }
+  
   return ContentService.createTextOutput(JSON.stringify({ transactions: transactions }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
@@ -266,7 +288,7 @@ const TransactionList: React.FC<{
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAIEnabled) {
-      alert("Receipt scanning requires an API Key.");
+      alert("AI Features disabled. Check API_KEY in Vercel.");
       return;
     }
     const file = e.target.files?.[0];
@@ -467,29 +489,42 @@ const App: React.FC = () => {
     if (!syncUrl) return alert("Enter your Sync URL first.");
     setIsSyncing(true);
     try {
+      // Step 1: Push current state to Cloud
       await fetch(syncUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ transactions })
       });
+      
+      // Step 2: Fetch the unified state back from Cloud
       const res = await fetch(syncUrl);
       const data = await res.json();
+      
       if (data.transactions) {
+        // Simple merge: prefer IDs from cloud
         setTransactions(data.transactions);
         setLastSync(new Date().toLocaleTimeString());
-        alert("Synced successfully!");
+        alert("Cloud Sync Complete! You and your partner are now aligned.");
       }
     } catch (err) {
       console.error(err);
-      alert("Sync failed. Check your Web App URL.");
+      alert("Sync failed. Ensure your Google Apps Script is deployed as a Web App to 'Anyone'.");
     } finally {
       setIsSyncing(false);
     }
   };
 
+  const handleCopyCode = () => {
+    try {
+      navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+      alert("Apps Script code copied!");
+    } catch (e) {
+      alert("Copy failed.");
+    }
+  };
+
   const isAIEnabled = useMemo(() => {
     try {
-      // Vite will literally replace this string during bundling
       const key = (process.env as any).API_KEY;
       return !!(key && key !== 'undefined' && key.trim().length > 5);
     } catch (e) {
@@ -510,8 +545,8 @@ const App: React.FC = () => {
                 <strong>Your 3-Step Solution:</strong>
                 <ol className="list-decimal ml-5 mt-2 space-y-2">
                   <li>Ensure you've added <code>API_KEY</code> in <strong>Vercel Project Settings</strong>.</li>
-                  <li>In your editor, confirm <strong>Import Map</strong> is gone from <code>index.html</code>.</li>
-                  <li>When your lockout ends, click <strong>Redeploy</strong> in Vercel.</li>
+                  <li>In your code editor, confirm <strong>Import Map</strong> is removed from <code>index.html</code>.</li>
+                  <li>Click <strong>Redeploy</strong> in Vercel.</li>
                 </ol>
               </p>
             </div>
@@ -530,10 +565,67 @@ const App: React.FC = () => {
                     <div className="flex justify-between items-center text-white/90">
                       <span className="text-xs font-bold">Injected API Key:</span>
                       <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${isAIEnabled ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                        {isAIEnabled ? 'PROPAGATED' : 'NOT FOUND'}
+                        {isAIEnabled ? 'READY' : 'NOT DETECTED'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-white/90">
+                      <span className="text-xs font-bold">Cloud Sync Status:</span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${!!syncUrl ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                        {!!syncUrl ? 'CONNECTED' : 'DISCONNECTED'}
                       </span>
                     </div>
                   </div>
+                </section>
+
+                <section className="space-y-4">
+                  <h2 className="text-xl font-black tracking-tight">Cloud Database</h2>
+                  <Card title="Google Sheets Integration">
+                    <div className="space-y-4">
+                      <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                        <p className="text-[10px] font-black uppercase text-indigo-500 mb-2">Instructions</p>
+                        <ol className="text-[11px] font-bold text-slate-600 space-y-2 list-decimal ml-4">
+                          <li>Create a new Google Sheet.</li>
+                          <li>Go to <strong>Extensions > Apps Script</strong>.</li>
+                          <li>Click the button below to copy the code.</li>
+                          <li>Paste it in and <strong>Save</strong>.</li>
+                          <li>Click <strong>Deploy > New Deployment</strong>.</li>
+                          <li>Select <strong>Web App</strong>, Access: <strong>Anyone</strong>.</li>
+                          <li>Copy the <strong>Web App URL</strong> and paste it below.</li>
+                        </ol>
+                      </div>
+                      
+                      <button 
+                        onClick={handleCopyCode} 
+                        className="w-full py-3 bg-white border-2 border-indigo-100 text-indigo-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50 transition-colors"
+                      >
+                        Copy Apps Script Code
+                      </button>
+
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Web App URL</p>
+                        <input 
+                          value={syncUrl} 
+                          onChange={e => setSyncUrl(e.target.value)} 
+                          className="w-full px-4 py-4 rounded-xl bg-slate-50 border-none text-sm font-bold outline-none focus:ring-2 ring-indigo-500/20" 
+                          placeholder="https://script.google.com/macros/s/..."
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center pt-2">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Last Contact</span>
+                          <span className="text-[10px] font-black text-slate-900 uppercase">{lastSync}</span>
+                        </div>
+                        <button 
+                          onClick={syncData} 
+                          disabled={isSyncing || !syncUrl} 
+                          className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest disabled:opacity-30 hover:bg-indigo-600 transition-all active:scale-95 shadow-lg"
+                        >
+                          {isSyncing ? 'Syncing...' : 'Sync Now'}
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
                 </section>
 
                 <section className="space-y-4">
@@ -546,26 +638,6 @@ const App: React.FC = () => {
                       <input value={partnerNames[UserRole.PARTNER_2]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_2]: e.target.value})} className="w-full text-lg font-black text-rose-500 bg-transparent outline-none" />
                     </Card>
                   </div>
-                </section>
-
-                <section className="space-y-4">
-                  <h2 className="text-xl font-black tracking-tight">Cloud Database</h2>
-                  <Card title="Google Sheets Sync URL">
-                    <div className="space-y-4">
-                      <input 
-                        value={syncUrl} 
-                        onChange={e => setSyncUrl(e.target.value)} 
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none text-sm font-medium outline-none focus:ring-2 ring-indigo-500/10" 
-                        placeholder="https://script.google.com/..."
-                      />
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Last Sync: {lastSync}</span>
-                        <button onClick={syncData} disabled={isSyncing} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50 hover:bg-indigo-700 transition-colors">
-                          {isSyncing ? 'Linking...' : 'Sync Cloud'}
-                        </button>
-                      </div>
-                    </div>
-                  </Card>
                 </section>
 
                 <section className="space-y-4">
