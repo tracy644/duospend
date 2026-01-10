@@ -1,11 +1,12 @@
-declare var process: any;
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
+// Note: process.env.API_KEY is replaced by Vite at build time.
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = (process.env as any).API_KEY;
   
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    console.error("Gemini API Key is missing. Check Vercel Environment Variables.");
     return null;
   }
   
@@ -19,7 +20,7 @@ const getAIClient = () => {
 
 export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]) => {
   const ai = getAIClient();
-  if (!ai) return "API Key not found in current build.";
+  if (!ai) return "AI Coach is currently offline (API Key Missing).";
 
   const summary = transactions.map(t => {
     return `${t.date}: ${t.description} - $${t.totalAmount} in ${t.splits[0]?.categoryName}`;
@@ -32,12 +33,13 @@ export const analyzeSpending = async (transactions: Transaction[], budgets: Reco
       model: 'gemini-3-pro-preview',
       contents: `Analyze this couple's shared finances:\n\nSPENDING:\n${summary}\n\nLIMITS:\n${budgetSummary}`,
       config: {
-        systemInstruction: "You are 'DuoCoach', a Sharp financial advisor for couples. Help them save. Provide 3 actionable tips. Be concise, warm, and use emojis.",
+        systemInstruction: "You are 'DuoCoach', a sharp financial advisor for couples. Provide 3 actionable tips based on their actual spending. Be concise, warm, and use emojis.",
       },
     });
     return response.text || "No insights found.";
   } catch (err) {
-    return "Error connecting to AI Coach.";
+    console.error(err);
+    return "Error connecting to AI Coach. Please try again later.";
   }
 };
 
@@ -57,7 +59,7 @@ export const parseReceipt = async (base64Image: string, categories: CategoryDefi
         ]
       },
       config: {
-        systemInstruction: `Return JSON: { "amount": number, "description": string, "categoryName": string }. Categories: [${catList}].`,
+        systemInstruction: `Extract the total amount, store name, and best category. Return ONLY JSON: { "amount": number, "description": string, "categoryName": string }. Available Categories: [${catList}].`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -73,6 +75,7 @@ export const parseReceipt = async (base64Image: string, categories: CategoryDefi
     if (!response.text) return null;
     return JSON.parse(response.text.trim());
   } catch (error) {
+    console.error("Receipt parsing error:", error);
     return null;
   }
 };

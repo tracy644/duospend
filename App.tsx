@@ -1,4 +1,3 @@
-declare var process: any;
 import React, { useState, useEffect, useMemo } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, Category } from './types';
@@ -9,7 +8,7 @@ const generateId = () => {
   try {
     return crypto.randomUUID();
   } catch (e) {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return Math.random().toString(36).substring(2, 15);
   }
 };
 
@@ -267,7 +266,7 @@ const TransactionList: React.FC<{
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAIEnabled) {
-      alert("Receipt scanning requires an API Key. Ensure you have added API_KEY to Vercel and REDEPLOYED.");
+      alert("Receipt scanning requires an API Key.");
       return;
     }
     const file = e.target.files?.[0];
@@ -482,28 +481,16 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      alert("Sync failed. Check your Web App URL and deployment settings.");
+      alert("Sync failed. Check your Web App URL.");
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const handleCopyCode = () => {
-    try {
-      navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
-      alert("Script copied to clipboard!");
-    } catch (e) {
-      alert("Failed to copy. Please manually select the text.");
-    }
-  };
-
-  // Robust check for the API key to avoid crashing the whole React app
-  // Vite replaces the entire 'process.env.API_KEY' string during build.
-  // We use a safe fallback to ensure logic flows even if build is stale.
   const isAIEnabled = useMemo(() => {
     try {
-      const key = process.env.API_KEY;
-      // Key must exist and be longer than a placeholder like "" or "undefined"
+      // Vite will literally replace this string during bundling
+      const key = (process.env as any).API_KEY;
       return !!(key && key !== 'undefined' && key.trim().length > 5);
     } catch (e) {
       return false;
@@ -518,13 +505,13 @@ const App: React.FC = () => {
             <div className="mt-10 p-6 bg-rose-50 border border-rose-100 rounded-[32px] text-rose-800 animate-in">
               <h2 className="text-lg font-black uppercase tracking-tighter mb-2">Setup Required</h2>
               <p className="text-sm font-medium leading-relaxed">
-                The <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> is still missing from the browser bundle.
+                The <code>API_KEY</code> is still missing from the built app.
                 <br /><br />
-                <strong>How to fix:</strong>
-                <ol className="list-decimal ml-5 mt-2 space-y-1">
-                  <li>Ensure you added <code>API_KEY</code> in Vercel settings.</li>
-                  <li>Click <strong>Redeploy</strong> in Vercel (Existing builds won't see new keys).</li>
-                  <li>Verify the key is named exactly <code>API_KEY</code> (all caps).</li>
+                <strong>Your 3-Step Solution:</strong>
+                <ol className="list-decimal ml-5 mt-2 space-y-2">
+                  <li>Ensure you've added <code>API_KEY</code> in <strong>Vercel Project Settings</strong>.</li>
+                  <li>In your editor, confirm <strong>Import Map</strong> is gone from <code>index.html</code>.</li>
+                  <li>When your lockout ends, click <strong>Redeploy</strong> in Vercel.</li>
                 </ol>
               </p>
             </div>
@@ -538,37 +525,32 @@ const App: React.FC = () => {
                 <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Launch Pad</h1></header>
                 
                 <section className="space-y-4">
-                  <h2 className="text-xl font-black tracking-tight">Go Live Checklist</h2>
+                  <h2 className="text-xl font-black tracking-tight">System Status</h2>
                   <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
-                    {[
-                      { step: 1, text: "Deploy to Vercel (Done)", done: true },
-                      { step: 2, text: "Verify API_KEY in Environment", done: isAIEnabled },
-                      { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl && syncUrl.includes('google.com') },
-                      { step: 4, text: "Personalize Partner Names", done: partnerNames[UserRole.PARTNER_1] !== 'Partner 1' || partnerNames[UserRole.PARTNER_2] !== 'Partner 2' }
-                    ].map(s => (
-                      <div key={s.step} className="flex items-center gap-4 text-white/90">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${s.done ? 'bg-emerald-500' : 'bg-white/10'}`}>
-                          {s.done ? '✓' : s.step}
-                        </div>
-                        <span className={`text-xs font-bold ${s.done ? 'opacity-50 line-through' : ''}`}>{s.text}</span>
-                      </div>
-                    ))}
+                    <div className="flex justify-between items-center text-white/90">
+                      <span className="text-xs font-bold">Injected API Key:</span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${isAIEnabled ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                        {isAIEnabled ? 'PROPAGATED' : 'NOT FOUND'}
+                      </span>
+                    </div>
                   </div>
                 </section>
 
                 <section className="space-y-4">
-                  <h2 className="text-xl font-black tracking-tight">Diagnostic</h2>
-                  <Card title="Configuration Status">
-                    <div className="space-y-2 text-[10px] font-mono text-slate-500 uppercase font-bold">
-                      <div className="flex justify-between"><span>Vite Replacement:</span> <span className={isAIEnabled ? 'text-emerald-500' : 'text-rose-500'}>{isAIEnabled ? 'ACTIVE' : 'INACTIVE'}</span></div>
-                      <div className="flex justify-between"><span>Environment:</span> <span>BROWSER BUNDLE</span></div>
-                    </div>
-                  </Card>
+                  <h2 className="text-xl font-black tracking-tight">Partner Profiles</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card title="Partner 1">
+                      <input value={partnerNames[UserRole.PARTNER_1]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_1]: e.target.value})} className="w-full text-lg font-black text-indigo-500 bg-transparent outline-none" />
+                    </Card>
+                    <Card title="Partner 2">
+                      <input value={partnerNames[UserRole.PARTNER_2]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_2]: e.target.value})} className="w-full text-lg font-black text-rose-500 bg-transparent outline-none" />
+                    </Card>
+                  </div>
                 </section>
 
                 <section className="space-y-4">
-                  <h2 className="text-xl font-black tracking-tight">Cloud Sync</h2>
-                  <Card title="Shared Database URL">
+                  <h2 className="text-xl font-black tracking-tight">Cloud Database</h2>
+                  <Card title="Google Sheets Sync URL">
                     <div className="space-y-4">
                       <input 
                         value={syncUrl} 
@@ -583,30 +565,6 @@ const App: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  </Card>
-                </section>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <Card title="Partner 1">
-                    <input value={partnerNames[UserRole.PARTNER_1]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_1]: e.target.value})} className="w-full text-lg font-black text-indigo-500 bg-transparent outline-none" />
-                  </Card>
-                  <Card title="Partner 2">
-                    <input value={partnerNames[UserRole.PARTNER_2]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_2]: e.target.value})} className="w-full text-lg font-black text-rose-500 bg-transparent outline-none" />
-                  </Card>
-                </div>
-
-                <section className="space-y-4">
-                  <div className="flex justify-between items-end px-2">
-                    <h2 className="text-xl font-black tracking-tight">Backend Script</h2>
-                    <button onClick={handleCopyCode} className="text-[9px] font-black uppercase bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 mb-1 active:scale-95 transition-all">Copy Code</button>
-                  </div>
-                  <Card title="Apps Script (Instructions Inside)">
-                    <p className="text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Extension &gt; Apps Script in Sheets</p>
-                    <textarea 
-                      readOnly 
-                      value={GOOGLE_APPS_SCRIPT_CODE} 
-                      className="w-full h-32 bg-slate-50 text-slate-600 p-4 rounded-xl text-[9px] font-mono border-none focus:ring-0" 
-                    />
                   </Card>
                 </section>
 
@@ -644,10 +602,6 @@ const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string,
   const [isLoading, setIsLoading] = useState(false);
 
   const getAdvice = async () => {
-    if (!isEnabled) {
-      alert("AI Coaching is unavailable. Ensure you have added API_KEY to Vercel and REDEPLOYED.");
-      return;
-    }
     setIsLoading(true);
     try {
       const result = await analyzeSpending(transactions, budgets, categories);
