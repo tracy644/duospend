@@ -1,5 +1,5 @@
-import React, { useState, useMemo, memo } from 'react';
-import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal } from '../types';
+import React, { useState, useMemo, memo, useEffect } from 'react';
+import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
 import { analyzeSpending, parseReceipt } from '../services/geminiService';
 import { Card, ProgressBar } from './UI';
 import { GOOGLE_APPS_SCRIPT_CODE, performSync } from '../utils/sync';
@@ -64,9 +64,53 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(20);
+  
+  // New Log State
   const [newDesc, setNewDesc] = useState('');
-  const [newAmount, setNewAmount] = useState('');
   const [newUser, setNewUser] = useState(UserRole.PARTNER_1);
+  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newSplits, setNewSplits] = useState<TransactionSplit[]>([{ categoryName: categories[0]?.name || '', amount: 0 }]);
+
+  const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [newSplits]);
+
+  const handleAddSplit = () => {
+    setNewSplits([...newSplits, { categoryName: categories[0]?.name || '', amount: 0 }]);
+  };
+
+  const handleRemoveSplit = (index: number) => {
+    if (newSplits.length <= 1) return;
+    setNewSplits(newSplits.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateSplit = (index: number, field: keyof TransactionSplit, value: any) => {
+    const updated = [...newSplits];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewSplits(updated);
+  };
+
+  const resetForm = () => {
+    setNewDesc('');
+    setNewUser(UserRole.PARTNER_1);
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setNewSplits([{ categoryName: categories[0]?.name || '', amount: 0 }]);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (totalAmount <= 0) return alert("Total must be greater than 0");
+    
+    onAdd({
+      id: generateId(),
+      description: newDesc || 'Expense',
+      date: new Date(newDate).toISOString(),
+      userId: newUser,
+      splits: newSplits.map(s => ({ ...s, amount: Number(s.amount) })),
+      totalAmount: totalAmount
+    });
+    
+    setIsModalOpen(false);
+    resetForm();
+  };
 
   const groups = useMemo(() => {
     const sorted = [...transactions].sort((a,b) => b.date.localeCompare(a.date)).slice(0, displayLimit);
@@ -81,27 +125,99 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
 
   return (
     <div className="space-y-8 animate-in pb-10">
-      <header className="flex justify-between items-center pt-4"><h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1><button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">Log Entry</button></header>
+      <header className="flex justify-between items-center pt-4">
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
+        <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">
+          Log Entry
+        </button>
+      </header>
+      
       <div className="space-y-10">
         {groups.map(([date, txs]) => (
-          <div key={date} className="space-y-4"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{date}</h3>
+          <div key={date} className="space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{date}</h3>
             {txs.map((t: any) => (
               <div key={t.id} className="bg-white p-5 rounded-[24px] border border-slate-50 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">{categories.find((c: any) => c.name === t.splits[0]?.categoryName)?.icon}</div><div><h4 className="font-bold text-slate-900 text-sm">{t.description}</h4><p className="text-[10px] font-black text-slate-400 uppercase">{partnerNames[t.userId]}</p></div></div>
-                <div className="flex items-center gap-4"><span className="text-lg font-black text-slate-900">${t.totalAmount.toFixed(2)}</span><button onClick={() => onDelete(t.id)} className="text-slate-100 hover:text-rose-400">×</button></div>
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">
+                    {categories.find((c: any) => c.name === t.splits[0]?.categoryName)?.icon || '💰'}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{t.description}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">
+                      {partnerNames[t.userId]} • {t.splits.length} {t.splits.length === 1 ? 'cat' : 'cats'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-lg font-black text-slate-900">${t.totalAmount.toFixed(2)}</span>
+                  <button onClick={() => onDelete(t.id)} className="text-slate-100 hover:text-rose-400 p-1">×</button>
+                </div>
               </div>
             ))}
           </div>
         ))}
       </div>
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-[2px] p-4">
-          <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl animate-in">
-            <h2 className="text-2xl font-black mb-6">New Log</h2>
-            <form onSubmit={(e) => { e.preventDefault(); onAdd({ id: generateId(), description: newDesc, date: new Date().toISOString(), userId: newUser, splits: [{ categoryName: categories[0].name, amount: parseFloat(newAmount) }], totalAmount: parseFloat(newAmount) }); setIsModalOpen(false); }} className="space-y-4">
-              <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold" placeholder="Store Name" />
-              <input type="number" step="0.01" required value={newAmount} onChange={e => setNewAmount(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-black" placeholder="0.00" />
-              <div className="flex gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-black uppercase text-[10px] text-slate-400">Cancel</button><button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">Add</button></div>
+          <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl animate-in max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-2xl font-black tracking-tight">New Log</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-slate-500 font-bold">Close</button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-3">
+                <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none" placeholder="Store Name" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} required className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none" />
+                  <select value={newUser} onChange={e => setNewUser(e.target.value as UserRole)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none">
+                    <option value={UserRole.PARTNER_1}>{partnerNames[UserRole.PARTNER_1]}</option>
+                    <option value={UserRole.PARTNER_2}>{partnerNames[UserRole.PARTNER_2]}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center px-1">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Splits</h3>
+                  <button type="button" onClick={handleAddSplit} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Category</button>
+                </div>
+                
+                {newSplits.map((split, index) => (
+                  <div key={index} className="flex gap-2 items-center animate-in">
+                    <select 
+                      value={split.categoryName} 
+                      onChange={e => handleUpdateSplit(index, 'categoryName', e.target.value)}
+                      className="flex-1 px-4 py-4 rounded-2xl bg-slate-50 font-bold outline-none text-sm"
+                    >
+                      {categories.map((c: any) => <option key={c.id} value={c.name}>{c.icon} {c.name}</option>)}
+                    </select>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      required 
+                      value={split.amount || ''} 
+                      onChange={e => handleUpdateSplit(index, 'amount', e.target.value)}
+                      className="w-24 px-4 py-4 rounded-2xl bg-slate-50 font-black text-right outline-none" 
+                      placeholder="0.00" 
+                    />
+                    {newSplits.length > 1 && (
+                      <button type="button" onClick={() => handleRemoveSplit(index)} className="text-slate-200 hover:text-rose-400 p-1 text-xl">×</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-900 rounded-[32px] p-6 text-white flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Total</span>
+                <span className="text-3xl font-black">${totalAmount.toFixed(2)}</span>
+              </div>
+
+              <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase text-[12px] tracking-widest shadow-xl active:scale-95 transition-all">
+                Confirm Entry
+              </button>
             </form>
           </div>
         </div>
@@ -144,7 +260,7 @@ export const SettingsView = memo(({ partnerNames, setPartnerNames, syncUrl, setS
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight">Sync</h2>
         <Card title="Google Sheets">
-          <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4" placeholder="URL..." />
+          <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4 outline-none" placeholder="URL..." />
           <button onClick={async () => { setIsSyncing(true); const d = await performSync(syncUrl, transactions); setTransactions(d.transactions); setLastSync(new Date().toLocaleTimeString()); setIsSyncing(false); }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">{isSyncing ? '...' : 'Sync Now'}</button>
         </Card>
       </section>
