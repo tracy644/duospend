@@ -499,7 +499,15 @@ const App: React.FC = () => {
 
   // Robust check for the API key to avoid crashing the whole React app
   // Vite replaces the entire 'process.env.API_KEY' string during build.
-  const isAIEnabled = !!(process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY.length > 5);
+  // We use a safe fallback to ensure logic flows even if build is stale.
+  const isAIEnabled = useMemo(() => {
+    try {
+      const key = process.env.API_KEY;
+      return !!(key && key !== 'undefined' && key.length > 5);
+    } catch (e) {
+      return false;
+    }
+  }, []);
 
   return (
     <HashRouter>
@@ -511,7 +519,7 @@ const App: React.FC = () => {
               <p className="text-sm font-medium leading-relaxed">
                 The <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> is currently missing or invalid. 
                 Receipt scanning and AI coaching are disabled. 
-                <strong>To fix:</strong> Ensure you have clicked <strong>Redeploy</strong> in Vercel after adding the environment variable.
+                <strong>To fix:</strong> Ensure you have removed the <strong>importmap</strong> from index.html and then click <strong>Redeploy</strong> in Vercel.
               </p>
             </div>
           )}
@@ -547,7 +555,8 @@ const App: React.FC = () => {
                   <Card title="Configuration Status">
                     <div className="space-y-2 text-[10px] font-mono text-slate-500 uppercase font-bold">
                       <div className="flex justify-between"><span>API_KEY Propagated:</span> <span className={isAIEnabled ? 'text-emerald-500' : 'text-rose-500'}>{isAIEnabled ? 'YES' : 'NO'}</span></div>
-                      <div className="flex justify-between"><span>Build System:</span> <span>VITE</span></div>
+                      <div className="flex justify-between"><span>Environment:</span> <span>VITE / BROWSER</span></div>
+                      <div className="flex justify-between"><span>Key Length:</span> <span>{isAIEnabled ? 'OK' : 'INVALID'}</span></div>
                     </div>
                   </Card>
                 </section>
