@@ -498,9 +498,8 @@ const App: React.FC = () => {
   };
 
   // Robust check for the API key to avoid crashing the whole React app
-  // Vite replaces process.env.API_KEY with a string literal or "undefined" during build
-  const apiKeyRaw = typeof process !== 'undefined' ? process.env.API_KEY : '';
-  const isAIEnabled = !!(apiKeyRaw && apiKeyRaw !== 'undefined' && apiKeyRaw.length > 5);
+  // Vite replaces the entire 'process.env.API_KEY' string during build.
+  const isAIEnabled = !!(process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY.length > 5);
 
   return (
     <HashRouter>
@@ -512,7 +511,7 @@ const App: React.FC = () => {
               <p className="text-sm font-medium leading-relaxed">
                 The <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> is currently missing or invalid. 
                 Receipt scanning and AI coaching are disabled. 
-                <strong>To fix:</strong> Add <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> to Vercel Environment Variables and click <strong>Redeploy</strong>.
+                <strong>To fix:</strong> Ensure you have clicked <strong>Redeploy</strong> in Vercel after adding the environment variable.
               </p>
             </div>
           )}
@@ -548,7 +547,7 @@ const App: React.FC = () => {
                   <Card title="Configuration Status">
                     <div className="space-y-2 text-[10px] font-mono text-slate-500 uppercase font-bold">
                       <div className="flex justify-between"><span>API_KEY Propagated:</span> <span className={isAIEnabled ? 'text-emerald-500' : 'text-rose-500'}>{isAIEnabled ? 'YES' : 'NO'}</span></div>
-                      <div className="flex justify-between"><span>Runtime Environment:</span> <span>{typeof process !== 'undefined' ? 'BROWSER/VITE' : 'UNKNOWN'}</span></div>
+                      <div className="flex justify-between"><span>Build System:</span> <span>VITE</span></div>
                     </div>
                   </Card>
                 </section>

@@ -6,7 +6,6 @@ import { Transaction, CategoryDefinition } from "../types";
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   
-  // Robust check for missing or 'undefined' string keys from Vite
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     return null;
   }
@@ -22,7 +21,7 @@ const getAIClient = () => {
 export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]) => {
   const ai = getAIClient();
   if (!ai) {
-    return "AI Coaching is unavailable because the API_KEY is not set in environment variables.";
+    return "AI Coaching is unavailable because the API_KEY is not set correctly.";
   }
 
   const summary = transactions.map(t => {
