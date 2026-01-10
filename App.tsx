@@ -499,11 +499,11 @@ const App: React.FC = () => {
 
   // Robust check for the API key to avoid crashing the whole React app
   // Vite replaces the entire 'process.env.API_KEY' string during build.
-  // We use a safe fallback to ensure logic flows even if build is stale.
+  // This value is strictly managed by Vercel environment variables.
   const isAIEnabled = useMemo(() => {
     try {
       const key = process.env.API_KEY;
-      return !!(key && key !== 'undefined' && key.length > 5);
+      return !!(key && key !== 'undefined' && key.trim().length > 10);
     } catch (e) {
       return false;
     }
@@ -517,9 +517,10 @@ const App: React.FC = () => {
             <div className="mt-10 p-6 bg-rose-50 border border-rose-100 rounded-[32px] text-rose-800 animate-in">
               <h2 className="text-lg font-black uppercase tracking-tighter mb-2">Setup Required</h2>
               <p className="text-sm font-medium leading-relaxed">
-                The <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> is currently missing or invalid. 
+                The <code className="bg-rose-100 px-1 rounded font-bold">API_KEY</code> is missing from the bundle. 
                 Receipt scanning and AI coaching are disabled. 
-                <strong>To fix:</strong> Ensure you have removed the <strong>importmap</strong> from index.html and then click <strong>Redeploy</strong> in Vercel.
+                <br /><br />
+                <strong>The Fix:</strong> You must click <strong>Redeploy</strong> in Vercel to allow Vite to inject your API_KEY into the final build.
               </p>
             </div>
           )}
@@ -536,7 +537,7 @@ const App: React.FC = () => {
                   <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
                     {[
                       { step: 1, text: "Deploy to Vercel (Done)", done: true },
-                      { step: 2, text: "Verify API_KEY in Environment", done: isAIEnabled },
+                      { step: 2, text: "Verify API_KEY Injection", done: isAIEnabled },
                       { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl && syncUrl.includes('google.com') },
                       { step: 4, text: "Personalize Partner Names", done: partnerNames[UserRole.PARTNER_1] !== 'Partner 1' || partnerNames[UserRole.PARTNER_2] !== 'Partner 2' }
                     ].map(s => (
@@ -554,9 +555,8 @@ const App: React.FC = () => {
                   <h2 className="text-xl font-black tracking-tight">Diagnostic</h2>
                   <Card title="Configuration Status">
                     <div className="space-y-2 text-[10px] font-mono text-slate-500 uppercase font-bold">
-                      <div className="flex justify-between"><span>API_KEY Propagated:</span> <span className={isAIEnabled ? 'text-emerald-500' : 'text-rose-500'}>{isAIEnabled ? 'YES' : 'NO'}</span></div>
-                      <div className="flex justify-between"><span>Environment:</span> <span>VITE / BROWSER</span></div>
-                      <div className="flex justify-between"><span>Key Length:</span> <span>{isAIEnabled ? 'OK' : 'INVALID'}</span></div>
+                      <div className="flex justify-between"><span>Vite Injected Key:</span> <span className={isAIEnabled ? 'text-emerald-500' : 'text-rose-500'}>{isAIEnabled ? 'PROPAGATED' : 'MISSING'}</span></div>
+                      <div className="flex justify-between"><span>Runtime Environment:</span> <span>BROWSER BUNDLE</span></div>
                     </div>
                   </Card>
                 </section>
