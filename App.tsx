@@ -493,16 +493,27 @@ const App: React.FC = () => {
     }
   };
 
-  const apiKeyExists = typeof process !== 'undefined' && process.env && process.env.API_KEY && process.env.API_KEY !== 'undefined';
+  // Safely check for API Key without crashing
+  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : null;
+  const isApiKeyConfigured = apiKey && apiKey !== 'undefined';
 
   return (
     <HashRouter>
       <div className="min-h-screen pb-40 px-6">
         <div className="max-w-xl mx-auto">
+          {!isApiKeyConfigured && (
+            <div className="mt-10 p-6 bg-rose-50 border border-rose-100 rounded-[32px] text-rose-800 animate-in">
+              <h2 className="text-lg font-black uppercase tracking-tighter mb-2">Configuration Warning</h2>
+              <p className="text-sm font-medium leading-relaxed">
+                The <code className="bg-rose-100 px-1 rounded">API_KEY</code> environment variable is missing in Vercel. 
+                Features like <strong>Receipt Scanning</strong> and <strong>AI Coaching</strong> will be disabled until fixed.
+              </p>
+            </div>
+          )}
           <Routes>
             <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} goals={goals} onUpdateGoal={updateGoal} onSettleUp={handleSettleUp} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
             <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} onAdd={addTransaction} onDelete={deleteTransaction} />} />
-            <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} /></div>} />
+            <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} isEnabled={isApiKeyConfigured} /></div>} />
             <Route path="/settings" element={
               <div className="space-y-10 animate-in pt-10 pb-10">
                 <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Launch Pad</h1></header>
@@ -512,7 +523,7 @@ const App: React.FC = () => {
                   <div className="bg-slate-900 rounded-[32px] p-6 space-y-4 shadow-xl">
                     {[
                       { step: 1, text: "Deploy to Vercel (Done)", done: true },
-                      { step: 2, text: "Verify API_KEY in Environment", done: !!apiKeyExists },
+                      { step: 2, text: "Verify API_KEY in Environment", done: !!isApiKeyConfigured },
                       { step: 3, text: "Deploy Google Sheets Script", done: !!syncUrl && syncUrl.includes('google.com') },
                       { step: 4, text: "Personalize Partner Names", done: partnerNames[UserRole.PARTNER_1] !== 'Partner 1' || partnerNames[UserRole.PARTNER_2] !== 'Partner 2' }
                     ].map(s => (
@@ -599,11 +610,12 @@ const App: React.FC = () => {
   );
 };
 
-const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[] }> = ({ transactions, budgets, categories }) => {
+const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[], isEnabled: boolean }> = ({ transactions, budgets, categories, isEnabled }) => {
   const [advice, setAdvice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const getAdvice = async () => {
+    if (!isEnabled) return alert("AI Coaching is currently disabled. Check the Configuration Warning on the Home tab.");
     setIsLoading(true);
     try {
       const result = await analyzeSpending(transactions, budgets, categories);
@@ -621,8 +633,8 @@ const AIAdvisor: React.FC<{ transactions: Transaction[], budgets: Record<string,
       <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl relative overflow-hidden text-center">
         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full" />
         <h2 className="text-2xl font-black mb-6 tracking-tight leading-tight">Ready for a spending review?</h2>
-        <button onClick={getAdvice} disabled={isLoading} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50">
-          {isLoading ? 'Crunching Numbers...' : 'Ask AI Coach'}
+        <button onClick={getAdvice} disabled={isLoading || !isEnabled} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50">
+          {isLoading ? 'Crunching Numbers...' : isEnabled ? 'Ask AI Coach' : 'Disabled'}
         </button>
       </div>
       {advice && (
