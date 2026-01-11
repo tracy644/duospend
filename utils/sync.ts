@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v1.9 (Automatic Yearly Tabs) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.0 (Verified Multi-Year Tabs) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -85,13 +85,16 @@ function updateYearlySummarySheets(ss, txs) {
     totalRow.push(grandTotal);
     sheet.appendRow(totalRow);
 
-    // Apply basic styling
+    // Apply layout styling
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
     sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#e2e8f0");
     sheet.setFrozenRows(1);
     sheet.setFrozenColumns(1);
+    
+    // Auto-resize columns for readability
+    sheet.autoResizeColumns(1, lastCol);
   });
 }
 
