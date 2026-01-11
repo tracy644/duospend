@@ -62,8 +62,7 @@ export const Dashboard = memo(({
 
 export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: any) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [displayLimit, setDisplayLimit] = useState(20);
+  const [displayLimit] = useState(20);
   
   // New Log State
   const [newDesc, setNewDesc] = useState('');
@@ -84,7 +83,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
 
   const handleUpdateSplit = (index: number, field: keyof TransactionSplit, value: any) => {
     const updated = [...newSplits];
-    updated[index] = { ...updated[index], [field]: value };
+    updated[index] = { ...updated[index], [field]: field === 'amount' ? value : value };
     setNewSplits(updated);
   };
 
@@ -241,7 +240,7 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
   );
 });
 
-export const SettingsView = memo(({ partnerNames, setPartnerNames, syncUrl, setSyncUrl, lastSync, setLastSync, transactions, setTransactions }: any) => {
+export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync, setLastSync, transactions, setTransactions }: any) => {
   const [isSyncing, setIsSyncing] = useState(false);
   return (
     <div className="space-y-10 animate-in pt-10 pb-10">
@@ -253,15 +252,33 @@ export const SettingsView = memo(({ partnerNames, setPartnerNames, syncUrl, setS
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight">Profiles</h2>
         <div className="grid grid-cols-2 gap-4">
-          <Card title="P1"><input value={partnerNames[UserRole.PARTNER_1]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_1]: e.target.value})} className="w-full text-lg font-black text-indigo-500 bg-transparent outline-none" /></Card>
-          <Card title="P2"><input value={partnerNames[UserRole.PARTNER_2]} onChange={e => setPartnerNames({...partnerNames, [UserRole.PARTNER_2]: e.target.value})} className="w-full text-lg font-black text-rose-500 bg-transparent outline-none" /></Card>
+          <Card title="Partner 1"><div className="w-full text-lg font-black text-indigo-500">{partnerNames[UserRole.PARTNER_1]}</div></Card>
+          <Card title="Partner 2"><div className="w-full text-lg font-black text-rose-500">{partnerNames[UserRole.PARTNER_2]}</div></Card>
         </div>
       </section>
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight">Sync</h2>
         <Card title="Google Sheets">
           <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4 outline-none" placeholder="URL..." />
-          <button onClick={async () => { setIsSyncing(true); const d = await performSync(syncUrl, transactions); setTransactions(d.transactions); setLastSync(new Date().toLocaleTimeString()); setIsSyncing(false); }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">{isSyncing ? '...' : 'Sync Now'}</button>
+          <button onClick={async () => { 
+            if (!syncUrl) return alert("Please enter a Sync URL first.");
+            setIsSyncing(true); 
+            try {
+              const d = await performSync(syncUrl, transactions); 
+              setTransactions(d.transactions); 
+              setLastSync(new Date().toLocaleTimeString()); 
+            } catch (err) {
+              alert("Sync failed. Check your URL and Apps Script deployment.");
+            }
+            setIsSyncing(false); 
+          }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">{isSyncing ? '...' : 'Sync Now'}</button>
+        </Card>
+        
+        <Card title="Technical Setup">
+          <div className="bg-slate-50 p-4 rounded-2xl overflow-x-auto">
+            <code className="text-[8px] whitespace-pre text-slate-500">{GOOGLE_APPS_SCRIPT_CODE}</code>
+          </div>
+          <p className="mt-3 text-[10px] text-slate-400">If you updated the split feature, you MUST re-deploy your Apps Script with this new code.</p>
         </Card>
       </section>
     </div>

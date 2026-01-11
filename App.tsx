@@ -11,7 +11,8 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = Object.values(Category).map((ca
   icon: CATEGORY_ICONS[catName] || '💰'
 }));
 
-const DEFAULT_PARTNER_NAMES: PartnerNames = {
+// Hardcoded names for Tracy and Trish
+const PARTNER_NAMES: PartnerNames = {
   [UserRole.PARTNER_1]: 'Tracy',
   [UserRole.PARTNER_2]: 'Trish',
 };
@@ -37,14 +38,11 @@ const Navigation = memo(() => {
 });
 
 const App: React.FC = () => {
-  const [partnerNames, setPartnerNames] = useState<PartnerNames>(() => {
-    const saved = localStorage.getItem('ds_partners');
-    return saved ? JSON.parse(saved) : DEFAULT_PARTNER_NAMES;
-  });
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('ds_tx');
     return saved ? JSON.parse(saved) : [];
   });
+  
   const [budgets] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('ds_budgets');
     if (saved) return JSON.parse(saved);
@@ -52,14 +50,15 @@ const App: React.FC = () => {
     DEFAULT_CATEGORIES.forEach(c => initial[c.name] = 100);
     return initial;
   });
+
   const [goals, setGoals] = useState<Goal[]>(() => {
     const saved = localStorage.getItem('ds_goals');
     return saved ? JSON.parse(saved) : [{ id: '1', name: 'Emergency Fund', target: 5000, current: 0, icon: '🛡️' }];
   });
+
   const [syncUrl, setSyncUrl] = useState(() => localStorage.getItem('ds_sync_url') || '');
   const [lastSync, setLastSync] = useState(() => localStorage.getItem('ds_last_sync') || 'Never');
 
-  useEffect(() => localStorage.setItem('ds_partners', JSON.stringify(partnerNames)), [partnerNames]);
   useEffect(() => localStorage.setItem('ds_tx', JSON.stringify(transactions)), [transactions]);
   useEffect(() => localStorage.setItem('ds_goals', JSON.stringify(goals)), [goals]);
   useEffect(() => localStorage.setItem('ds_sync_url', syncUrl), [syncUrl]);
@@ -75,10 +74,10 @@ const App: React.FC = () => {
       <div className="min-h-screen pb-40 px-6">
         <div className="max-w-xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} goals={goals} onUpdateGoal={(id, amt) => setGoals(g => g.map(x => x.id === id ? {...x, current: amt} : x))} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
-            <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={partnerNames} onAdd={t => setTransactions(p => [...p, t])} onDelete={id => setTransactions(p => p.filter(t => t.id !== id))} isAIEnabled={isAIEnabled} />} />
+            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} goals={goals} onUpdateGoal={(id: string, amt: number) => setGoals(g => g.map(x => x.id === id ? {...x, current: amt} : x))} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
+            <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} onAdd={(t: Transaction) => setTransactions(p => [...p, t])} onDelete={(id: string) => setTransactions(p => p.filter(t => t.id !== id))} isAIEnabled={isAIEnabled} />} />
             <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} isEnabled={isAIEnabled} /></div>} />
-            <Route path="/settings" element={<SettingsView partnerNames={partnerNames} setPartnerNames={setPartnerNames} syncUrl={syncUrl} setSyncUrl={setSyncUrl} lastSync={lastSync} setLastSync={setLastSync} transactions={transactions} setTransactions={setTransactions} />} />
+            <Route path="/settings" element={<SettingsView partnerNames={PARTNER_NAMES} syncUrl={syncUrl} setSyncUrl={setSyncUrl} lastSync={lastSync} setLastSync={setLastSync} transactions={transactions} setTransactions={setTransactions} />} />
           </Routes>
         </div>
         <Navigation />
