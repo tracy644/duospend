@@ -69,7 +69,7 @@ export const Dashboard = memo(({
                   <span>-${data.tracyPaidThisMonth.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-black uppercase text-indigo-500">
-                  <span>45% of Remainder:</span>
+                  <span>Equity Remainder:</span>
                   <span>${data.tracyOwesThisMonth.toFixed(2)}</span>
                 </div>
               </div>
