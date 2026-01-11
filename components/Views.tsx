@@ -1,6 +1,6 @@
-import React, { useState, useMemo, memo, useEffect } from 'react';
+import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
-import { analyzeSpending } from '../services/geminiService';
+import { analyzeSpending, parseReceipt } from '../services/geminiService';
 import { Card, ProgressBar } from './UI';
 import { GOOGLE_APPS_SCRIPT_CODE, performSync } from '../utils/sync';
 
@@ -96,7 +96,7 @@ export const Dashboard = memo(({
                 <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
                   Tracy owes ${data.tracyOwesThisMonth.toFixed(2)}
                 </span>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Target: 45% of partner expenses</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Monthly Settlement</p>
               </div>
               <div className="pt-3 border-t border-slate-50 space-y-1">
                 <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
@@ -104,7 +104,7 @@ export const Dashboard = memo(({
                   <span>${data.tracyPaidThisMonth.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-black uppercase text-indigo-500">
-                  <span>Settlement Due:</span>
+                  <span>Balance Due:</span>
                   <span>${data.tracyOwesThisMonth.toFixed(2)}</span>
                 </div>
               </div>
@@ -192,10 +192,13 @@ interface TransactionListProps {
 
 export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: TransactionListProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [newUser, setNewUser] = useState(UserRole.PARTNER_1);
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newSplits, setNewSplits] = useState<TransactionSplit[]>([{ categoryName: categories[0]?.name || '', amount: 0 }]);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [newSplits]);
 
@@ -211,8 +214,39 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
       totalAmount: totalAmount
     });
     setIsModalOpen(false);
+    resetForm();
+  };
+
+  const resetForm = () => {
     setNewDesc('');
     setNewSplits([{ categoryName: categories[0]?.name || '', amount: 0 }]);
+  };
+
+  const handleScanClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsing(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      const result = await parseReceipt(base64, categories);
+      if (result) {
+        setNewDesc(result.description);
+        setNewSplits([{ categoryName: result.categoryName || categories[0].name, amount: result.amount }]);
+        setIsModalOpen(true);
+      } else {
+        alert("Could not parse receipt. Please enter manually.");
+      }
+      setIsParsing(false);
+      // Reset input so same file can be scanned again if needed
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   const groups = useMemo(() => {
@@ -228,11 +262,33 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
 
   return (
     <div className="space-y-8 animate-in pb-10">
-      <header className="flex justify-between items-center pt-4">
+      <header className="flex flex-col gap-4 pt-4">
         <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
-        <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">
-          Log Entry
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setIsModalOpen(true)} 
+            className="flex-1 bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            Log Entry
+          </button>
+          <button 
+            onClick={handleScanClick}
+            disabled={isParsing || !isAIEnabled}
+            className={`flex-1 bg-white border border-slate-200 text-slate-900 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 ${isParsing ? 'opacity-50' : ''}`}
+          >
+            {isParsing ? (
+              <div className="w-4 h-4 border-2 border-slate-900/20 border-t-slate-900 rounded-full animate-spin" />
+            ) : '📷 Scan Receipt'}
+          </button>
+        </div>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          accept="image/*" 
+          capture="environment" 
+          className="hidden" 
+        />
       </header>
       
       <div className="space-y-10">
@@ -267,7 +323,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
           <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl animate-in max-h-[90vh] overflow-y-auto no-scrollbar">
             <div className="flex justify-between items-start mb-6">
               <h2 className="text-2xl font-black tracking-tight">New Log</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-slate-500 font-bold">Close</button>
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-slate-300 hover:text-slate-500 font-bold">Close</button>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
