@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
@@ -10,7 +11,8 @@ const getAIClient = () => {
   }
   
   try {
-    return new GoogleGenAI({ apiKey });
+    // Guidelines: Use process.env.API_KEY string directly when initializing the client instance
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
   } catch (e) {
     console.error("Failed to initialize GoogleGenAI:", e);
     return null;
