@@ -304,7 +304,7 @@ export const SettingsView = memo(({
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
         <Card title="Script Engine v3.3 (Aligned & Final)">
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
-            1. Copy code. 2. Update Apps Script. 3. <strong>Deploy > New Deployment</strong>. 4. Paste NEW URL below.
+            1. Copy code. 2. Update Apps Script. 3. <strong>Deploy &gt; New Deployment</strong>. 4. Paste NEW URL below.
           </p>
           <button 
             onClick={handleCopy}
