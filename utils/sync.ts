@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.2 (Timezone Alignment) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.3 (Aligned & Clean) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -62,7 +62,6 @@ function updateYearlySummarySheets(ss, txs) {
   txs.forEach(t => {
     const d = new Date(t.date);
     if (isNaN(d.getTime())) return;
-    // CRITICAL: Use UTC to match the ISO storage format in the App
     const year = d.getUTCFullYear();
     const monthIdx = d.getUTCMonth(); 
     

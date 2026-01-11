@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.2</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.3</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -302,7 +302,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.2 (Timezone Fix)">
+        <Card title="Script Engine v3.3 (Aligned & Final)">
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
             1. Copy code. 2. Update Apps Script. 3. <strong>Deploy > New Deployment</strong>. 4. Paste NEW URL below.
           </p>
@@ -314,7 +314,7 @@ export const SettingsView = memo(({
           </button>
           
           <p className="text-[9px] text-indigo-500 mt-2 font-bold px-1">
-            ✨ SYNC FIX: Logic updated to UTC to ensure the app and spreadsheet never drift!
+            ✨ SYNC READY: Final v3.3 build ensures UTC alignment and perfect version matching.
           </p>
 
           <div className="space-y-2 mt-6">
@@ -336,7 +336,7 @@ export const SettingsView = memo(({
                 setTransactions(d.transactions); 
                 if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Cloud Sync Successful! UTC Timezone alignment applied.");
+                alert("Cloud Sync Successful! App and Spreadsheet are now at v3.3.");
               }
             } catch (err) {
               alert("Sync failed: Check deployment settings.");
