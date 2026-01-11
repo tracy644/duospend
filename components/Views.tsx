@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.3</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.6</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -138,7 +138,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{t.description}</h4>
                     <p className="text-[10px] font-black text-slate-400 uppercase">
-                      {partnerNames[t.userId]} • {t.splits.length} {t.splits.length === 1 ? 'cat' : 'cats'}
+                      {partnerNames[t.userId]} • {t.splits.length} {t.splits.length === 1 ? 'category' : 'categories'}
                     </p>
                   </div>
                 </div>
@@ -172,8 +172,8 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Splits</h3>
-                  <button type="button" onClick={() => setNewSplits([...newSplits, { categoryName: categories[0].name, amount: 0 }])} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Category</button>
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Splits / Categories</h3>
+                  <button type="button" onClick={() => setNewSplits([...newSplits, { categoryName: categories[0].name, amount: 0 }])} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Category Split</button>
                 </div>
                 {newSplits.map((split, index) => (
                   <div key={index} className="flex gap-2 items-center">
@@ -197,12 +197,12 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
               </div>
 
               <div className="bg-slate-900 rounded-[32px] p-6 text-white flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Total</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Combined Total</span>
                 <span className="text-3xl font-black">${totalAmount.toFixed(2)}</span>
               </div>
 
               <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase text-[12px] tracking-widest shadow-xl active:scale-95 transition-all">
-                Confirm Entry
+                Save Transaction
               </button>
             </form>
           </div>
@@ -219,10 +219,10 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
     <div className="space-y-8 animate-in pb-10">
       <header><h1 className="text-4xl font-black text-slate-900 tracking-tight text-center">DuoCoach</h1></header>
       <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl text-center">
-        <h2 className="text-2xl font-black mb-6">Need advice?</h2>
-        <button onClick={async () => { setLoading(true); setAdvice(await analyzeSpending(transactions, budgets, categories)); setLoading(false); }} disabled={loading || !isEnabled} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px]">{loading ? '...' : 'Ask AI Coach'}</button>
+        <h2 className="text-2xl font-black mb-6">Ask DuoCoach</h2>
+        <button onClick={async () => { setLoading(true); setAdvice(await analyzeSpending(transactions, budgets, categories)); setLoading(false); }} disabled={loading || !isEnabled} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">{loading ? 'Thinking...' : 'Analyze My Spending'}</button>
       </div>
-      {advice && <div className="bg-white rounded-[40px] p-8 border shadow-xl animate-in text-sm text-slate-600 whitespace-pre-wrap">{advice}</div>}
+      {advice && <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-xl animate-in text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{advice}</div>}
     </div>
   );
 });
@@ -231,18 +231,18 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
   const [isSyncing, setIsSyncing] = useState(false);
   return (
     <div className="space-y-10 animate-in pt-10 pb-10">
-      <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Launch Pad</h1></header>
+      <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Setup</h1></header>
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight">Profiles</h2>
+        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Profiles</h2>
         <div className="grid grid-cols-2 gap-4">
-          <Card title="TRACY"><div className="w-full text-lg font-black text-indigo-500">{partnerNames[UserRole.PARTNER_1]}</div></Card>
-          <Card title="TRISH"><div className="w-full text-lg font-black text-rose-500">{partnerNames[UserRole.PARTNER_2]}</div></Card>
+          <Card title="TRACY" accent="bg-indigo-500"><div className="w-full text-lg font-black text-slate-900">Tracy</div></Card>
+          <Card title="TRISH" accent="bg-rose-500"><div className="w-full text-lg font-black text-slate-900">Trish</div></Card>
         </div>
       </section>
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight">Sync</h2>
+        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Data Sync</h2>
         <Card title="Google Sheets">
-          <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4 outline-none" placeholder="URL..." />
+          <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4 outline-none font-bold text-sm" placeholder="Paste Apps Script URL here..." />
           <button onClick={async () => { 
             if (!syncUrl) return alert("Please enter a Sync URL first.");
             setIsSyncing(true); 
@@ -251,20 +251,15 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
               setTransactions(d.transactions); 
               setLastSync(new Date().toLocaleTimeString()); 
             } catch (err) {
-              alert("Sync failed. Check your URL.");
+              alert("Sync failed. Ensure your Apps Script is deployed as 'Anyone'.");
             }
             setIsSyncing(false); 
-          }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">{isSyncing ? '...' : 'Sync Now'}</button>
-        </Card>
-        <Card title="Cloud Logic">
-          <div className="bg-slate-50 p-4 rounded-2xl overflow-x-auto">
-            <code className="text-[8px] whitespace-pre text-slate-500">{GOOGLE_APPS_SCRIPT_CODE}</code>
-          </div>
+          }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all">{isSyncing ? 'Syncing...' : 'Sync Now'}</button>
         </Card>
       </section>
-      <section className="pt-10">
-        <button onClick={() => { if(confirm("This will clear all data on this phone. Continue?")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-500 transition-colors">
-          Reset All Local Data
+      <section className="pt-10 border-t border-slate-100">
+        <button onClick={() => { if(confirm("This will delete everything stored on this device. Are you sure?")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4">
+          Dangerous: Reset All Local Storage
         </button>
       </section>
     </div>
