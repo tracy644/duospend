@@ -12,8 +12,8 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = Object.values(Category).map((ca
 }));
 
 const DEFAULT_PARTNER_NAMES: PartnerNames = {
-  [UserRole.PARTNER_1]: 'Partner 1',
-  [UserRole.PARTNER_2]: 'Partner 2',
+  [UserRole.PARTNER_1]: 'Tracy',
+  [UserRole.PARTNER_2]: 'Trish',
 };
 
 const Navigation = memo(() => {
