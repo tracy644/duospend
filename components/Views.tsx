@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.6</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.7</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -232,6 +232,7 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
   return (
     <div className="space-y-10 animate-in pt-10 pb-10">
       <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Setup</h1></header>
+      
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Profiles</h2>
         <div className="grid grid-cols-2 gap-4">
@@ -239,9 +240,24 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
           <Card title="TRISH" accent="bg-rose-500"><div className="w-full text-lg font-black text-slate-900">Trish</div></Card>
         </div>
       </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Technical Setup</h2>
+        <Card title="Google Apps Script (v1.7)">
+          <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
+            Copy the updated script code below into your Google Sheet's Apps Script editor and Re-Deploy to see the new Summary tab.
+          </p>
+          <textarea 
+            readOnly 
+            className="w-full h-32 bg-slate-50 rounded-xl p-4 text-[9px] font-mono border-none outline-none mb-4"
+            value={GOOGLE_APPS_SCRIPT_CODE}
+          />
+        </Card>
+      </section>
+
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Data Sync</h2>
-        <Card title="Google Sheets">
+        <Card title="Sync Controller">
           <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4 outline-none font-bold text-sm" placeholder="Paste Apps Script URL here..." />
           <button onClick={async () => { 
             if (!syncUrl) return alert("Please enter a Sync URL first.");
@@ -251,15 +267,17 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
               setTransactions(d.transactions); 
               setLastSync(new Date().toLocaleTimeString()); 
             } catch (err) {
-              alert("Sync failed. Ensure your Apps Script is deployed as 'Anyone'.");
+              alert("Sync failed. Check your script deployment and ensure it is set to 'Anyone'.");
             }
             setIsSyncing(false); 
           }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all">{isSyncing ? 'Syncing...' : 'Sync Now'}</button>
+          <p className="text-[8px] font-black text-slate-300 uppercase mt-4 tracking-tighter text-center">Last synced: {lastSync}</p>
         </Card>
       </section>
+
       <section className="pt-10 border-t border-slate-100">
         <button onClick={() => { if(confirm("This will delete everything stored on this device. Are you sure?")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4">
-          Dangerous: Reset All Local Storage
+          Dangerous: Reset Local Cache
         </button>
       </section>
     </div>

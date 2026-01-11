@@ -1,15 +1,17 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script (Supports Multi-Category Splits) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v1.7 (Monthly Summary Support) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheets()[0] || ss.insertSheet("Transactions");
+  const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
   const data = JSON.parse(e.postData.contents);
   const txs = data.transactions;
-  sheet.clear();
-  sheet.appendRow(["ID", "Date", "Description", "User", "Total Amount", "SplitsJSON"]);
+  
+  // 1. Update Raw Transactions
+  txSheet.clear();
+  txSheet.appendRow(["ID", "Date", "Description", "User", "Total Amount", "SplitsJSON"]);
   txs.forEach(t => {
-    sheet.appendRow([
+    txSheet.appendRow([
       t.id, 
       t.date, 
       t.description, 
@@ -18,12 +20,70 @@ function doPost(e) {
       JSON.stringify(t.splits)
     ]);
   });
+
+  // 2. Generate/Update Monthly Summary
+  updateSummarySheet(ss, txs);
+  
   return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function updateSummarySheet(ss, txs) {
+  let summarySheet = ss.getSheetByName("Monthly Summary") || ss.insertSheet("Monthly Summary");
+  summarySheet.clear();
+  
+  const headers = ["Category", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Yearly Total"];
+  summarySheet.appendRow(headers);
+  
+  // Extract all unique categories
+  const allCategories = [...new Set(txs.flatMap(t => t.splits.map(s => s.categoryName)))].sort();
+  const matrix = {}; // { category: [jan, feb, ...] }
+  
+  allCategories.forEach(cat => {
+    matrix[cat] = new Array(12).fill(0);
+  });
+  
+  txs.forEach(t => {
+    const d = new Date(t.date);
+    const monthIdx = d.getMonth(); // 0-11
+    if (!isNaN(monthIdx)) {
+      t.splits.forEach(s => {
+        if (matrix[s.categoryName]) {
+          matrix[s.categoryName][monthIdx] += Number(s.amount) || 0;
+        }
+      });
+    }
+  });
+  
+  allCategories.forEach(cat => {
+    const row = [cat, ...matrix[cat]];
+    const yearlyTotal = matrix[cat].reduce((a, b) => a + b, 0);
+    row.push(yearlyTotal);
+    summarySheet.appendRow(row);
+  });
+  
+  // Add a Grand Total row
+  const grandTotalRow = ["GRAND TOTAL"];
+  for (let m = 0; m < 13; m++) {
+    let colTotal = 0;
+    allCategories.forEach(cat => {
+      colTotal += (m < 12 ? matrix[cat][m] : matrix[cat].reduce((a,b) => a+b, 0));
+    });
+    grandTotalRow.push(colTotal);
+  }
+  summarySheet.appendRow(grandTotalRow);
+
+  // Formatting
+  const lastRow = summarySheet.getLastRow();
+  const lastCol = summarySheet.getLastColumn();
+  summarySheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
+  summarySheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#e2e8f0");
+  summarySheet.setFrozenRows(1);
+  summarySheet.setFrozenColumns(1);
 }
 
 function doGet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheets()[0];
+  const sheet = ss.getSheetByName("Transactions");
   if (!sheet) return ContentService.createTextOutput(JSON.stringify({ transactions: [] })).setMimeType(ContentService.MimeType.JSON);
   const rows = sheet.getDataRange().getValues();
   const transactions = [];
@@ -31,7 +91,6 @@ function doGet() {
     if (!rows[i][0]) continue;
     let splits = [];
     try {
-      // Try to parse splits from JSON column, fallback to single split if it's old data
       splits = JSON.parse(rows[i][5]);
     } catch (e) {
       splits = [{ categoryName: 'Other', amount: Number(rows[i][4]) }];
