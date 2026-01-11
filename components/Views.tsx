@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.0</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.1</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -243,12 +243,15 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Technical Setup</h2>
-        <Card title="Google Apps Script (v2.0 Milestone)">
+        <Card title="Google Apps Script (v2.1 Update)">
           <p className="text-[10px] font-bold text-indigo-500 mb-2 leading-relaxed">
-            🚀 Automatic Yearly Tab Logic Verified!
+            🚀 Multi-Year Support Ready!
           </p>
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
-            Copy the code below to your Apps Script and Re-Deploy. The script will look at your transaction dates and automatically create tabs like "Summary 2025", "Summary 2026", etc.
+            1. Copy the code below.<br/>
+            2. Go to Extensions > Apps Script in your Sheet.<br/>
+            3. Replace ALL existing code with this and Deploy as a NEW VERSION.<br/>
+            4. Click "Sync Now" below to generate your "Summary 2024", "Summary 2025" tabs automatically.
           </p>
           <textarea 
             readOnly 

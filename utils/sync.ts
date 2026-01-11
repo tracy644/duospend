@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.0 (Verified Multi-Year Tabs) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.1 (The "New Year" Fix) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -52,9 +52,14 @@ function updateYearlySummarySheets(ss, txs) {
   const catsSorted = Array.from(allCategories).sort();
 
   // For each year found in transactions, create/update its tab
-  Object.keys(yearMap).forEach(year => {
+  Object.keys(yearMap).sort().reverse().forEach(year => {
     const sheetName = "Summary " + year;
     let sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+    
+    // Move newest years to the front of the tabs list
+    ss.setActiveSheet(sheet);
+    ss.moveActiveSheet(1); 
+    
     sheet.clear();
     
     const headers = ["Category", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Yearly Total"];
@@ -85,15 +90,19 @@ function updateYearlySummarySheets(ss, txs) {
     totalRow.push(grandTotal);
     sheet.appendRow(totalRow);
 
-    // Apply layout styling
+    // Apply Professional Styling
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
-    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
-    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#e2e8f0");
+    
+    // Header styling
+    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9").setFontColor("#475569");
+    // Totals row styling
+    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#e2e8f0").setBorder(true, null, null, null, null, null);
+    // Currency formatting for numbers
+    sheet.getRange(2, 2, lastRow, lastCol - 1).setNumberFormat("$#,##0.00");
+    
     sheet.setFrozenRows(1);
     sheet.setFrozenColumns(1);
-    
-    // Auto-resize columns for readability
     sheet.autoResizeColumns(1, lastCol);
   });
 }
