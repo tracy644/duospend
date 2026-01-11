@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.1</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.2</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -235,8 +235,8 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight">Profiles</h2>
         <div className="grid grid-cols-2 gap-4">
-          <Card title="Partner 1"><div className="w-full text-lg font-black text-indigo-500">{partnerNames[UserRole.PARTNER_1]}</div></Card>
-          <Card title="Partner 2"><div className="w-full text-lg font-black text-rose-500">{partnerNames[UserRole.PARTNER_2]}</div></Card>
+          <Card title="TRACY"><div className="w-full text-lg font-black text-indigo-500">{partnerNames[UserRole.PARTNER_1]}</div></Card>
+          <Card title="TRISH"><div className="w-full text-lg font-black text-rose-500">{partnerNames[UserRole.PARTNER_2]}</div></Card>
         </div>
       </section>
       <section className="space-y-4">
@@ -261,6 +261,11 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
             <code className="text-[8px] whitespace-pre text-slate-500">{GOOGLE_APPS_SCRIPT_CODE}</code>
           </div>
         </Card>
+      </section>
+      <section className="pt-10">
+        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-500 transition-colors">
+          Reset All Local Data
+        </button>
       </section>
     </div>
   );
