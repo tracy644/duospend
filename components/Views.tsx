@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.5</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.6</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -281,7 +281,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v2.5 (Budget Sync)">
+        <Card title="Script Engine v2.6 (Equity Logic)">
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
             1. Copy code. 2. Update Apps Script. 3. <strong>Deploy > New Deployment</strong>. 4. Paste NEW URL below.
           </p>
@@ -292,6 +292,10 @@ export const SettingsView = memo(({
             {copied ? '✅ Code Copied!' : '📋 Copy Script Code'}
           </button>
           
+          <p className="text-[9px] text-indigo-500 mt-2 font-bold px-1">
+            ✨ NEW: Yearly summary tabs now calculate Tracy's 45% contribution automatically!
+          </p>
+
           <div className="space-y-2 mt-6">
             <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Web App Deployment URL</label>
             <input 
@@ -309,9 +313,9 @@ export const SettingsView = memo(({
               const d = await performSync(syncUrl, transactions, budgets); 
               if (d.transactions) {
                 setTransactions(d.transactions); 
-                if (d.budgets) setBudgets(d.budgets); // Sync budgets from cloud
+                if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Cloud Sync Successful! Budgets and Transactions are now in harmony.");
+                alert("Cloud Sync Successful! Your spreadsheets now have the updated equity split row.");
               }
             } catch (err) {
               alert("Sync failed: Check deployment settings.");

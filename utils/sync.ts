@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.5 (Budget Cloud Engine) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.6 (Equity Split Engine) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -58,6 +58,7 @@ function updateYearlySummarySheets(ss, txs) {
       yearMap[year][cat][monthIdx] += Number(s.amount) || 0;
     });
   });
+
   const catsSorted = Array.from(allCategories).sort();
   Object.keys(yearMap).sort().reverse().forEach(year => {
     const sheetName = "Summary " + year;
@@ -65,15 +66,50 @@ function updateYearlySummarySheets(ss, txs) {
     ss.setActiveSheet(sheet);
     ss.moveActiveSheet(1);
     sheet.clear();
-    sheet.appendRow(["Category", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Yearly Total"]);
+    
+    const headers = ["Category", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Yearly Total"];
+    sheet.appendRow(headers);
+    
+    const yearData = yearMap[year];
     catsSorted.forEach(cat => {
-      const monthData = yearMap[year][cat];
+      const monthData = yearData[cat];
       if (monthData) {
         const row = [cat, ...monthData, monthData.reduce((a, b) => a + b, 0)];
         sheet.appendRow(row);
       }
     });
-    // Totals row... (omitted for brevity in this comment, full script remains robust)
+
+    // Calculate Grand Totals
+    const totalRow = ["GRAND TOTAL"];
+    let grandTotal = 0;
+    for (let m = 0; m < 12; m++) {
+      let monthSum = 0;
+      catsSorted.forEach(cat => {
+        if (yearData[cat]) monthSum += yearData[cat][m];
+      });
+      totalRow.push(monthSum);
+      grandTotal += monthSum;
+    }
+    totalRow.push(grandTotal);
+    sheet.appendRow(totalRow);
+
+    // Calculate Tracy Owes (45% of Total)
+    const tracyOwesRow = ["Tracy owes (45%)"];
+    for (let m = 1; m < totalRow.length; m++) {
+      tracyOwesRow.push(Number(totalRow[m]) * 0.45);
+    }
+    sheet.appendRow(tracyOwesRow);
+
+    // Styling
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f8fafc");
+    sheet.getRange(lastRow - 1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
+    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#eef2ff").setFontColor("#4f46e5");
+    sheet.getRange(2, 2, lastRow, lastCol).setNumberFormat("$#,##0.00");
+    sheet.setFrozenRows(1);
+    sheet.setFrozenColumns(1);
+    sheet.autoResizeColumns(1, lastCol);
   });
 }
 
