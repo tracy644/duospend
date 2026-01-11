@@ -1,43 +1,52 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.1 (The "New Year" Fix) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.2 (Multi-Year Engine) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
-  const data = JSON.parse(e.postData.contents);
-  const txs = data.transactions;
   
-  // 1. Update Raw Transactions
-  txSheet.clear();
-  txSheet.appendRow(["ID", "Date", "Description", "User", "Total Amount", "SplitsJSON"]);
-  txs.forEach(t => {
-    txSheet.appendRow([
-      t.id, 
-      t.date, 
-      t.description, 
-      t.userId, 
-      t.totalAmount, 
-      JSON.stringify(t.splits)
-    ]);
-  });
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const txs = data.transactions;
+    
+    if (!txs || !Array.isArray(txs)) {
+       throw new Error("No transactions array found in payload");
+    }
 
-  // 2. Generate/Update Year-Specific Summary Tabs
-  updateYearlySummarySheets(ss, txs);
-  
-  return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+    // 1. Update Raw Transactions
+    txSheet.clear();
+    txSheet.appendRow(["ID", "Date", "Description", "User", "Total Amount", "SplitsJSON"]);
+    txs.forEach(t => {
+      txSheet.appendRow([
+        t.id, 
+        t.date, 
+        t.description, 
+        t.userId, 
+        t.totalAmount, 
+        JSON.stringify(t.splits)
+      ]);
+    });
+
+    // 2. Generate/Update Year-Specific Summary Tabs
+    updateYearlySummarySheets(ss, txs);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: txs.length })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function updateYearlySummarySheets(ss, txs) {
-  // Organize data by { year: { category: [jan, feb, ...] } }
   const yearMap = {}; 
   const allCategories = new Set();
 
   txs.forEach(t => {
+    // Ensure we parse the date correctly from ISO string
     const d = new Date(t.date);
+    if (isNaN(d.getTime())) return; // Skip invalid dates
+    
     const year = d.getFullYear();
     const monthIdx = d.getMonth(); 
-    
-    if (isNaN(year) || isNaN(monthIdx)) return;
     
     if (!yearMap[year]) yearMap[year] = {};
 
@@ -50,18 +59,13 @@ function updateYearlySummarySheets(ss, txs) {
   });
 
   const catsSorted = Array.from(allCategories).sort();
+  const years = Object.keys(yearMap).sort().reverse();
 
-  // For each year found in transactions, create/update its tab
-  Object.keys(yearMap).sort().reverse().forEach(year => {
+  years.forEach(year => {
     const sheetName = "Summary " + year;
     let sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
     
-    // Move newest years to the front of the tabs list
-    ss.setActiveSheet(sheet);
-    ss.moveActiveSheet(1); 
-    
     sheet.clear();
-    
     const headers = ["Category", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Yearly Total"];
     sheet.appendRow(headers);
     
@@ -90,17 +94,12 @@ function updateYearlySummarySheets(ss, txs) {
     totalRow.push(grandTotal);
     sheet.appendRow(totalRow);
 
-    // Apply Professional Styling
+    // Styling
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
-    
-    // Header styling
-    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9").setFontColor("#475569");
-    // Totals row styling
-    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#e2e8f0").setBorder(true, null, null, null, null, null);
-    // Currency formatting for numbers
+    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f8fafc").setFontColor("#1e293b");
+    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
     sheet.getRange(2, 2, lastRow, lastCol - 1).setNumberFormat("$#,##0.00");
-    
     sheet.setFrozenRows(1);
     sheet.setFrozenColumns(1);
     sheet.autoResizeColumns(1, lastCol);
@@ -136,11 +135,17 @@ function doGet() {
 
 export const performSync = async (url: string, transactions: Transaction[]) => {
   if (!url) throw new Error("Sync URL missing");
-  await fetch(url, { 
+  const postResponse = await fetch(url, { 
     method: 'POST', 
     headers: { 'Content-Type': 'text/plain' }, 
     body: JSON.stringify({ transactions }) 
   });
+  
+  const postResult = await postResponse.json();
+  if (postResult.status === 'error') {
+    throw new Error("Script Error: " + postResult.message);
+  }
+
   const res = await fetch(url);
   return await res.json();
 };
