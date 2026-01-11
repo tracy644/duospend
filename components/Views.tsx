@@ -1,12 +1,12 @@
+
 import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
-import { analyzeSpending, parseReceipt } from '../services/geminiService';
+import { analyzeSpending, parseReceipt, detectSubscriptions, parseVoiceTransaction } from '../services/geminiService';
 import { Card, ProgressBar } from './UI';
 import { GOOGLE_APPS_SCRIPT_CODE, performSync } from '../utils/sync';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
-// Define prop interfaces for type safety
 interface DashboardProps {
   transactions: Transaction[];
   budgets: Record<string, number>;
@@ -43,7 +43,7 @@ export const Dashboard = memo(({
         setLastSync(new Date().toLocaleTimeString());
       }
     } catch (err) {
-      alert("Cloud Sync failed. Check your internet or script URL.");
+      alert("Cloud Sync failed.");
     } finally {
       setIsSyncing(false);
     }
@@ -77,7 +77,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.5</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.6</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -116,9 +116,7 @@ export const Dashboard = memo(({
             disabled={isSyncing}
             className={`w-full bg-slate-900 rounded-[32px] p-8 text-left text-white shadow-xl transition-all active:scale-95 flex flex-col justify-between group overflow-hidden relative ${isSyncing ? 'opacity-80' : ''}`}
           >
-             {isSyncing && (
-               <div className="absolute top-0 left-0 h-1 bg-indigo-500 animate-pulse w-full" />
-             )}
+             {isSyncing && <div className="absolute top-0 left-0 h-1 bg-indigo-500 animate-pulse w-full" />}
              <div>
                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Cloud Synchronization</h3>
                <p className="text-xl font-black tracking-tight mb-2">
@@ -143,20 +141,17 @@ export const Dashboard = memo(({
             <div className="mb-6 p-5 bg-slate-50 rounded-[24px] border border-slate-100">
               <div className="flex justify-between items-end mb-3">
                 <div>
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spent / Budget</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Spent / Budget</p>
                   <p className="text-2xl font-black text-slate-900">
                     ${data.totalCombined.toFixed(0)} <span className="text-slate-300 font-normal text-lg">/ ${data.totalBudget.toFixed(0)}</span>
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Remaining</p>
+                  <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Rem.</p>
                   <p className="text-sm font-black text-emerald-600">${data.remainingBudget.toFixed(0)}</p>
                 </div>
               </div>
-              <ProgressBar 
-                progress={(data.totalCombined / (data.totalBudget || 1)) * 100} 
-                color={data.totalCombined > data.totalBudget ? '#f43f5e' : '#6366f1'} 
-              />
+              <ProgressBar progress={(data.totalCombined / (data.totalBudget || 1)) * 100} color={data.totalCombined > data.totalBudget ? '#f43f5e' : '#6366f1'} />
             </div>
             
             <div className="max-h-[300px] overflow-y-auto no-scrollbar space-y-5 pr-1">
@@ -181,24 +176,18 @@ export const Dashboard = memo(({
   );
 });
 
-interface TransactionListProps {
-  transactions: Transaction[];
-  categories: CategoryDefinition[];
-  partnerNames: PartnerNames;
-  onAdd: (t: Transaction) => void;
-  onDelete: (id: string) => void;
-  isAIEnabled: boolean;
-}
-
 export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: TransactionListProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [newUser, setNewUser] = useState(UserRole.PARTNER_1);
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newSplits, setNewSplits] = useState<TransactionSplit[]>([{ categoryName: categories[0]?.name || '', amount: 0 }]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [newSplits]);
 
@@ -222,14 +211,11 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
     setNewSplits([{ categoryName: categories[0]?.name || '', amount: 0 }]);
   };
 
-  const handleScanClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleScanClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsParsing(true);
     const reader = new FileReader();
     reader.onload = async () => {
@@ -240,13 +226,50 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
         setNewSplits([{ categoryName: result.categoryName || categories[0].name, amount: result.amount }]);
         setIsModalOpen(true);
       } else {
-        alert("Could not parse receipt. Please enter manually.");
+        alert("Parsing failed.");
       }
       setIsParsing(false);
-      // Reset input so same file can be scanned again if needed
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsDataURL(file);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const reader = new FileReader();
+        reader.onload = async () => {
+          setIsParsing(true);
+          const base64 = (reader.result as string).split(',')[1];
+          const result = await parseVoiceTransaction(base64, categories);
+          if (result) {
+            setNewDesc(result.description);
+            setNewSplits([{ categoryName: result.categoryName || categories[0].name, amount: result.amount }]);
+            setIsModalOpen(true);
+          } else {
+            alert("Could not understand voice note.");
+          }
+          setIsParsing(false);
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      alert("Microphone access denied.");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
   };
 
   const groups = useMemo(() => {
@@ -264,31 +287,23 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
     <div className="space-y-8 animate-in pb-10">
       <header className="flex flex-col gap-4 pt-4">
         <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setIsModalOpen(true)} 
-            className="flex-1 bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all"
-          >
-            Log Entry
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">Log Entry</button>
+          <button onClick={handleScanClick} disabled={isParsing || !isAIEnabled} className={`bg-white border border-slate-200 text-slate-900 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isParsing ? 'opacity-50' : ''}`}>
+            {isParsing ? <div className="w-4 h-4 border-2 border-slate-900/20 border-t-slate-900 rounded-full animate-spin" /> : '📷 Scan'}
           </button>
           <button 
-            onClick={handleScanClick}
+            onMouseDown={startRecording} 
+            onMouseUp={stopRecording}
+            onTouchStart={startRecording}
+            onTouchEnd={stopRecording}
             disabled={isParsing || !isAIEnabled}
-            className={`flex-1 bg-white border border-slate-200 text-slate-900 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 ${isParsing ? 'opacity-50' : ''}`}
+            className={`col-span-2 bg-indigo-50 border border-indigo-100 text-indigo-600 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:bg-indigo-600 active:text-white transition-all ${isRecording ? 'animate-pulse bg-indigo-600 text-white scale-95 shadow-inner' : ''}`}
           >
-            {isParsing ? (
-              <div className="w-4 h-4 border-2 border-slate-900/20 border-t-slate-900 rounded-full animate-spin" />
-            ) : '📷 Scan Receipt'}
+            {isRecording ? '🎤 Listening...' : '🎙️ Hold to Speak Expense'}
           </button>
         </div>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          accept="image/*" 
-          capture="environment" 
-          className="hidden" 
-        />
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" capture="environment" className="hidden" />
       </header>
       
       <div className="space-y-10">
@@ -298,14 +313,10 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
             {txs.map((t: Transaction) => (
               <div key={t.id} className="bg-white p-5 rounded-[24px] border border-slate-50 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">
-                    {categories.find((c: CategoryDefinition) => c.name === t.splits[0]?.categoryName)?.icon || '💰'}
-                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">{categories.find((c: CategoryDefinition) => c.name === t.splits[0]?.categoryName)?.icon || '💰'}</div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{t.description}</h4>
-                    <p className="text-[10px] font-black text-slate-400 uppercase">
-                      {partnerNames[t.userId]} • {t.splits.length} {t.splits.length === 1 ? 'category' : 'categories'}
-                    </p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">{partnerNames[t.userId]} • {t.splits.length} {t.splits.length === 1 ? 'category' : 'categories'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -325,7 +336,6 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
               <h2 className="text-2xl font-black tracking-tight">New Log</h2>
               <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-slate-300 hover:text-slate-500 font-bold">Close</button>
             </div>
-            
             <form onSubmit={handleSubmit} className="space-y-6">
               <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none" placeholder="Store Name" />
               <div className="grid grid-cols-2 gap-3">
@@ -335,12 +345,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
                   <option value={UserRole.PARTNER_2}>{partnerNames[UserRole.PARTNER_2]}</option>
                 </select>
               </div>
-
               <div className="space-y-3">
-                <div className="flex justify-between items-center px-1">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Splits / Categories</h3>
-                  <button type="button" onClick={() => setNewSplits([...newSplits, { categoryName: categories[0].name, amount: 0 }])} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Category Split</button>
-                </div>
                 {newSplits.map((split, index) => (
                   <div key={index} className="flex gap-2 items-center">
                     <select value={split.categoryName} onChange={e => {
@@ -355,21 +360,14 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
                       updated[index].amount = Number(e.target.value);
                       setNewSplits(updated);
                     }} className="w-24 px-4 py-4 rounded-2xl bg-slate-50 font-black text-right outline-none" placeholder="0.00" />
-                    {newSplits.length > 1 && (
-                      <button type="button" onClick={() => setNewSplits(newSplits.filter((_, i) => i !== index))} className="text-slate-200 hover:text-rose-400 p-1 text-xl">×</button>
-                    )}
                   </div>
                 ))}
               </div>
-
               <div className="bg-slate-900 rounded-[32px] p-6 text-white flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Combined Total</span>
+                <span className="text-[10px] font-black uppercase opacity-50">Total</span>
                 <span className="text-3xl font-black">${totalAmount.toFixed(2)}</span>
               </div>
-
-              <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase text-[12px] tracking-widest shadow-xl active:scale-95 transition-all">
-                Save Transaction
-              </button>
+              <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase text-[12px] tracking-widest shadow-xl">Save Transaction</button>
             </form>
           </div>
         </div>
@@ -378,27 +376,56 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   );
 });
 
+export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }: AIAdvisorProps) => {
+  const [advice, setAdvice] = useState<string | null>(null);
+  const [subs, setSubs] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingSubs, setLoadingSubs] = useState(false);
+
+  return (
+    <div className="space-y-8 animate-in pb-10">
+      <header><h1 className="text-4xl font-black text-slate-900 tracking-tight text-center">DuoCoach</h1></header>
+      
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl text-center space-y-6">
+          <h2 className="text-2xl font-black">Monthly Insight</h2>
+          <button onClick={async () => { setLoading(true); setAdvice(await analyzeSpending(transactions, budgets, categories)); setLoading(false); }} disabled={loading || !isEnabled} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full">
+            {loading ? 'Thinking...' : 'Analyze My Spending'}
+          </button>
+          {advice && <div className="bg-white/10 rounded-3xl p-6 text-left text-sm text-white/90 whitespace-pre-wrap leading-relaxed border border-white/5">{advice}</div>}
+        </div>
+
+        <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-xl space-y-6">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">👻</span>
+            <h2 className="text-xl font-black text-slate-900">Ghost Detector</h2>
+          </div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Gemini will audit your history to find hidden recurring subscriptions.</p>
+          <button onClick={async () => { setLoadingSubs(true); setSubs(await detectSubscriptions(transactions)); setLoadingSubs(false); }} disabled={loadingSubs || !isEnabled} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full">
+            {loadingSubs ? 'Scanning History...' : 'Run Subscription Audit'}
+          </button>
+          {subs && <div className="bg-slate-50 rounded-3xl p-6 text-left text-sm text-slate-600 whitespace-pre-wrap leading-relaxed border border-slate-100 prose prose-sm">{subs}</div>}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+interface TransactionListProps {
+  transactions: Transaction[];
+  categories: CategoryDefinition[];
+  partnerNames: PartnerNames;
+  onAdd: (t: Transaction) => void;
+  onDelete: (id: string) => void;
+  isAIEnabled: boolean;
+}
+
 interface AIAdvisorProps {
   transactions: Transaction[];
   budgets: Record<string, number>;
   categories: CategoryDefinition[];
   isEnabled: boolean;
 }
-
-export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }: AIAdvisorProps) => {
-  const [advice, setAdvice] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  return (
-    <div className="space-y-8 animate-in pb-10">
-      <header><h1 className="text-4xl font-black text-slate-900 tracking-tight text-center">DuoCoach</h1></header>
-      <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl text-center">
-        <h2 className="text-2xl font-black mb-6">Ask DuoCoach</h2>
-        <button onClick={async () => { setLoading(true); setAdvice(await analyzeSpending(transactions, budgets, categories)); setLoading(false); }} disabled={loading || !isEnabled} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">{loading ? 'Thinking...' : 'Analyze My Spending'}</button>
-      </div>
-      {advice && <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-xl animate-in text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{advice}</div>}
-    </div>
-  );
-});
 
 interface SettingsViewProps {
   partnerNames: PartnerNames;
@@ -430,9 +457,8 @@ export const SettingsView = memo(({
   };
 
   const handleClearTransactions = () => {
-    if (confirm("Delete all local transactions? This cannot be undone. You must Sync afterward to clear the cloud.")) {
+    if (confirm("Delete all local transactions?")) {
       setTransactions([]);
-      alert("Local transactions cleared. Click 'Sync All Data Now' to update your spreadsheet.");
     }
   };
 
@@ -441,7 +467,7 @@ export const SettingsView = memo(({
       <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Setup</h1></header>
       
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Profiles</h2>
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Profiles</h2>
         <div className="grid grid-cols-2 gap-4">
           <Card title="TRACY" accent="bg-indigo-500"><div className="w-full text-lg font-black text-slate-900 tracking-tight">Tracy</div></Card>
           <Card title="TRISH" accent="bg-rose-500"><div className="w-full text-lg font-black text-slate-900 tracking-tight">Trish</div></Card>
@@ -449,8 +475,8 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Monthly Budgets</h2>
-        <Card title="Adjust Spending Limits">
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Budgets</h2>
+        <Card title="Adjust Limits">
           <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar py-2">
             {categories.map((cat: CategoryDefinition) => (
               <div key={cat.id} className="flex items-center gap-3">
@@ -458,45 +484,23 @@ export const SettingsView = memo(({
                 <span className="flex-1 text-[10px] font-black uppercase text-slate-500 tracking-tight">{cat.name}</span>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 font-bold">$</span>
-                  <input 
-                    type="number" 
-                    value={budgets[cat.name] || 0} 
-                    onChange={e => handleBudgetChange(cat.name, Number(e.target.value))}
-                    className="w-24 pl-6 pr-3 py-2 bg-slate-50 rounded-xl font-black text-right outline-none text-sm"
-                  />
+                  <input type="number" value={budgets[cat.name] || 0} onChange={e => handleBudgetChange(cat.name, Number(e.target.value))} className="w-24 pl-6 pr-3 py-2 bg-slate-50 rounded-xl font-black text-right outline-none text-sm" />
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-[8px] font-bold text-indigo-500 mt-4 uppercase tracking-widest text-center">Changes will sync to the cloud on next refresh.</p>
         </Card>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.5 (Final Release)">
-          <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
-            1. Copy code. 2. Update Apps Script. 3. <strong>Deploy &gt; New Deployment</strong>. 4. Paste NEW URL below.
-          </p>
-          <button 
-            onClick={handleCopy}
-            className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}
-          >
-            {copied ? '✅ Code Copied!' : '📋 Copy Script Code'}
-          </button>
-          
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
+        <Card title="Script Engine v3.6">
+          <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
-            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Web App Deployment URL</label>
-            <input 
-              value={syncUrl} 
-              onChange={e => setSyncUrl(e.target.value)} 
-              className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} 
-              placeholder="Paste the NEW Web App URL here..." 
-            />
+            <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
           </div>
-
           <button onClick={async () => { 
-            if (!syncUrl || !syncUrl.includes('exec')) return alert("Please enter a valid Web App URL (must end in /exec).");
+            if (!syncUrl || !syncUrl.includes('exec')) return alert("Enter valid URL.");
             setIsSyncing(true); 
             try {
               const d = await performSync(syncUrl, transactions, budgets); 
@@ -504,35 +508,18 @@ export const SettingsView = memo(({
                 setTransactions(d.transactions); 
                 if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Cloud Sync Successful! Database is synchronized.");
+                alert("Success!");
               }
-            } catch (err) {
-              alert("Sync failed: Check deployment settings.");
-            }
+            } catch (err) { alert("Sync failed."); }
             setIsSyncing(false); 
-          }} className="w-full mt-4 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all">
+          }} className="w-full mt-4 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">
             {isSyncing ? 'Syncing...' : 'Sync All Data Now'}
           </button>
-          <p className="text-[8px] font-black text-slate-300 uppercase mt-4 tracking-tighter text-center">Last Cloud Update: {lastSync}</p>
         </Card>
       </section>
 
-      <section className="space-y-4 pt-4">
-        <h2 className="text-xl font-black tracking-tight text-rose-500 uppercase text-[10px] tracking-[0.2em]">Maintenance / Fresh Start</h2>
-        <div className="space-y-3">
-          <button 
-            onClick={handleClearTransactions}
-            className="w-full bg-rose-50 text-rose-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all"
-          >
-            🗑️ Wipe All Transactions
-          </button>
-          <button 
-            onClick={() => { if(confirm("Delete all local cache (including sync URL and budgets)? Cloud data will remain safe.")) { localStorage.clear(); window.location.reload(); } }} 
-            className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4"
-          >
-            Reset App Cache
-          </button>
-        </div>
+      <section className="space-y-4 pt-4 text-center">
+        <button onClick={handleClearTransactions} className="text-[10px] font-black text-rose-500 uppercase tracking-widest">🗑️ Wipe Local Data</button>
       </section>
     </div>
   );

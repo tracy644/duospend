@@ -2,6 +2,7 @@
   "name": "DuoSpend - Shared Expense Tracker",
   "description": "A collaborative financial companion for couples to track monthly spending, manage category-based budgets, and analyze trends with AI-powered insights.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }
