@@ -30,9 +30,11 @@ export const Dashboard = memo(({
       }
     }
 
+    const totalBudget = Object.values(budgets).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0);
     const tracyOwesThisMonth = (totalCombined - tracyPaidThisMonth) * 0.45;
-    return { totals, totalCombined, tracyPaidThisMonth, tracyOwesThisMonth };
-  }, [transactions, categories, currentMonth, currentYear]);
+    
+    return { totals, totalCombined, totalBudget, tracyPaidThisMonth, tracyOwesThisMonth };
+  }, [transactions, categories, budgets, currentMonth, currentYear]);
 
   return (
     <div className="space-y-8 animate-in pb-10">
@@ -79,20 +81,39 @@ export const Dashboard = memo(({
           </Card>
         </div>
         <Card title="Budget Health">
-          <div className="space-y-5 py-2 max-h-[400px] overflow-y-auto no-scrollbar">
-            {categories.map((cat: any) => {
-              const spent = data.totals[cat.name] || 0;
-              const budget = budgets[cat.name] || 0;
-              return (
-                <div key={cat.id} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-black uppercase text-slate-500">{cat.icon} {cat.name}</span>
-                    <span className="text-[10px] font-black">${spent.toFixed(0)} / ${budget.toFixed(0)}</span>
-                  </div>
-                  <ProgressBar progress={(spent / (budget || 1)) * 100} color={spent > budget ? '#f43f5e' : cat.color} />
+          <div className="space-y-5 py-2">
+            <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex justify-between items-end mb-2">
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Monthly Spent</p>
+                  <p className="text-2xl font-black text-slate-900">${data.totalCombined.toFixed(2)}</p>
                 </div>
-              );
-            })}
+                <div className="text-right">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Combined Budget</p>
+                  <p className="text-sm font-bold text-slate-600">${data.totalBudget.toFixed(0)}</p>
+                </div>
+              </div>
+              <ProgressBar 
+                progress={(data.totalCombined / (data.totalBudget || 1)) * 100} 
+                color={data.totalCombined > data.totalBudget ? '#f43f5e' : '#6366f1'} 
+              />
+            </div>
+            
+            <div className="max-h-[300px] overflow-y-auto no-scrollbar space-y-5">
+              {categories.map((cat: any) => {
+                const spent = data.totals[cat.name] || 0;
+                const budget = budgets[cat.name] || 0;
+                return (
+                  <div key={cat.id} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black uppercase text-slate-500">{cat.icon} {cat.name}</span>
+                      <span className="text-[10px] font-black">${spent.toFixed(0)} / ${budget.toFixed(0)}</span>
+                    </div>
+                    <ProgressBar progress={(spent / (budget || 1)) * 100} color={spent > budget ? '#f43f5e' : cat.color} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </Card>
       </div>
