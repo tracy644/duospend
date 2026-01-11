@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
 import { analyzeSpending } from '../services/geminiService';
@@ -16,14 +15,39 @@ interface DashboardProps {
   goals: Goal[];
   isSynced: boolean;
   lastSync: string;
+  syncUrl: string;
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  setBudgets: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  setLastSync: (time: string) => void;
 }
 
 export const Dashboard = memo(({ 
-  transactions, budgets, categories, partnerNames, goals, isSynced, lastSync 
+  transactions, budgets, categories, partnerNames, goals, isSynced, lastSync, syncUrl, setTransactions, setBudgets, setLastSync
 }: DashboardProps) => {
+  const [isSyncing, setIsSyncing] = useState(false);
   const now = new Date();
   const currentMonth = now.getUTCMonth(); 
   const currentYear = now.getUTCFullYear();
+
+  const handleSync = async () => {
+    if (!syncUrl || !syncUrl.includes('exec')) {
+      alert("Please set a valid Sync URL in Setup first!");
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const d = await performSync(syncUrl, transactions, budgets);
+      if (d.transactions) {
+        setTransactions(d.transactions);
+        if (d.budgets) setBudgets(d.budgets);
+        setLastSync(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      alert("Cloud Sync failed. Check your internet or script URL.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const data = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -42,7 +66,6 @@ export const Dashboard = memo(({
       }
     }
 
-    // Explicitly define types to avoid 'left-hand side of arithmetic operation' errors
     const totalBudget: number = Object.values(budgets).reduce((acc: number, val: number) => acc + (val || 0), 0);
     const tracyOwesThisMonth: number = (totalCombined - tracyPaidThisMonth) * 0.45;
     const remainingBudget: number = Math.max(0, totalBudget - totalCombined);
@@ -67,11 +90,6 @@ export const Dashboard = memo(({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Card title="Total Spent This Month" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-xl">
-            <div className="text-5xl font-black tracking-tighter mb-1">${data.totalCombined.toFixed(2)}</div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Combined logs so far</p>
-          </Card>
-          
           <Card title="Shared Equity Status" accent="bg-indigo-500">
             <div className="space-y-3">
               <div className="space-y-1">
@@ -92,6 +110,32 @@ export const Dashboard = memo(({
               </div>
             </div>
           </Card>
+
+          <button 
+            onClick={handleSync}
+            disabled={isSyncing}
+            className={`w-full bg-slate-900 rounded-[32px] p-8 text-left text-white shadow-xl transition-all active:scale-95 flex flex-col justify-between group overflow-hidden relative ${isSyncing ? 'opacity-80' : ''}`}
+          >
+             {isSyncing && (
+               <div className="absolute top-0 left-0 h-1 bg-indigo-500 animate-pulse w-full" />
+             )}
+             <div>
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Cloud Synchronization</h3>
+               <p className="text-xl font-black tracking-tight mb-2">
+                 {isSyncing ? 'Synchronizing...' : 'Sync with Sheet'}
+               </p>
+               <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest leading-relaxed">
+                 {isSynced ? `Last update: ${lastSync}` : 'Cloud mirror offline'}
+               </p>
+             </div>
+             <div className="mt-6 self-end">
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <svg className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+             </div>
+          </button>
         </div>
 
         <Card title="Budget Health">
@@ -99,7 +143,7 @@ export const Dashboard = memo(({
             <div className="mb-6 p-5 bg-slate-50 rounded-[24px] border border-slate-100">
               <div className="flex justify-between items-end mb-3">
                 <div>
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Spent / Budget</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spent / Budget</p>
                   <p className="text-2xl font-black text-slate-900">
                     ${data.totalCombined.toFixed(0)} <span className="text-slate-300 font-normal text-lg">/ ${data.totalBudget.toFixed(0)}</span>
                   </p>

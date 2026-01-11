@@ -46,11 +46,6 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('ds_budgets');
     let b = saved ? JSON.parse(saved) : {};
     
-    // STRICT SANITIZATION: Explicitly remove Rent if it exists in old cache
-    delete b['Rent'];
-    delete b['rent'];
-    delete b['RENT'];
-    
     // Ensure all defined categories have at least a default budget
     DEFAULT_CATEGORIES.forEach(c => {
       if (b[c.name] === undefined) b[c.name] = 100;
@@ -82,7 +77,21 @@ const App: React.FC = () => {
       <div className="min-h-screen pb-40 px-6">
         <div className="max-w-xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} goals={goals} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
+            <Route path="/" element={
+              <Dashboard 
+                transactions={transactions} 
+                budgets={budgets} 
+                categories={DEFAULT_CATEGORIES} 
+                partnerNames={PARTNER_NAMES} 
+                goals={goals} 
+                isSynced={lastSync !== 'Never'} 
+                lastSync={lastSync}
+                syncUrl={syncUrl}
+                setTransactions={setTransactions}
+                setBudgets={setBudgets}
+                setLastSync={setLastSync}
+              />
+            } />
             <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} onAdd={(t: Transaction) => setTransactions(p => [...p, t])} onDelete={(id: string) => setTransactions(p => p.filter(t => t.id !== id))} isAIEnabled={isAIEnabled} />} />
             <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} isEnabled={isAIEnabled} /></div>} />
             <Route path="/settings" element={<SettingsView budgets={budgets} setBudgets={setBudgets} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} syncUrl={syncUrl} setSyncUrl={setSyncUrl} lastSync={lastSync} setLastSync={setLastSync} transactions={transactions} setTransactions={setTransactions} />} />
