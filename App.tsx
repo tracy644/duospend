@@ -11,7 +11,6 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = Object.values(Category).map((ca
   icon: CATEGORY_ICONS[catName] || '💰'
 }));
 
-// Strictly Hardcoded Names
 const PARTNER_NAMES: PartnerNames = {
   [UserRole.PARTNER_1]: 'Tracy',
   [UserRole.PARTNER_2]: 'Trish',
@@ -43,7 +42,7 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
   
-  const [budgets] = useState<Record<string, number>>(() => {
+  const [budgets, setBudgets] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('ds_budgets');
     if (saved) return JSON.parse(saved);
     const initial: Record<string, number> = {};
@@ -60,6 +59,7 @@ const App: React.FC = () => {
   const [lastSync, setLastSync] = useState(() => localStorage.getItem('ds_last_sync') || 'Never');
 
   useEffect(() => localStorage.setItem('ds_tx', JSON.stringify(transactions)), [transactions]);
+  useEffect(() => localStorage.setItem('ds_budgets', JSON.stringify(budgets)), [budgets]);
   useEffect(() => localStorage.setItem('ds_goals', JSON.stringify(goals)), [goals]);
   useEffect(() => localStorage.setItem('ds_sync_url', syncUrl), [syncUrl]);
   useEffect(() => localStorage.setItem('ds_last_sync', lastSync), [lastSync]);
@@ -74,10 +74,10 @@ const App: React.FC = () => {
       <div className="min-h-screen pb-40 px-6">
         <div className="max-w-xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} goals={goals} onUpdateGoal={(id: string, amt: number) => setGoals(g => g.map(x => x.id === id ? {...x, current: amt} : x))} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
+            <Route path="/" element={<Dashboard transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} goals={goals} isSynced={lastSync !== 'Never'} lastSync={lastSync} />} />
             <Route path="/transactions" element={<TransactionList transactions={transactions} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} onAdd={(t: Transaction) => setTransactions(p => [...p, t])} onDelete={(id: string) => setTransactions(p => p.filter(t => t.id !== id))} isAIEnabled={isAIEnabled} />} />
             <Route path="/ai" element={<div className="pt-10"><AIAdvisor transactions={transactions} budgets={budgets} categories={DEFAULT_CATEGORIES} isEnabled={isAIEnabled} /></div>} />
-            <Route path="/settings" element={<SettingsView partnerNames={PARTNER_NAMES} syncUrl={syncUrl} setSyncUrl={setSyncUrl} lastSync={lastSync} setLastSync={setLastSync} transactions={transactions} setTransactions={setTransactions} />} />
+            <Route path="/settings" element={<SettingsView budgets={budgets} setBudgets={setBudgets} categories={DEFAULT_CATEGORIES} partnerNames={PARTNER_NAMES} syncUrl={syncUrl} setSyncUrl={setSyncUrl} lastSync={lastSync} setLastSync={setLastSync} transactions={transactions} setTransactions={setTransactions} />} />
           </Routes>
         </div>
         <Navigation />

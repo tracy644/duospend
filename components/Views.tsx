@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.2</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.5</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -227,8 +227,22 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
   );
 });
 
-export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync, setLastSync, transactions, setTransactions }: any) => {
+export const SettingsView = memo(({ 
+  partnerNames, budgets, setBudgets, categories, syncUrl, setSyncUrl, lastSync, setLastSync, transactions, setTransactions 
+}: any) => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleBudgetChange = (catName: string, amount: number) => {
+    setBudgets((prev: any) => ({ ...prev, [catName]: amount }));
+  };
+
   return (
     <div className="space-y-10 animate-in pt-10 pb-10">
       <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Setup</h1></header>
@@ -236,55 +250,83 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Profiles</h2>
         <div className="grid grid-cols-2 gap-4">
-          <Card title="TRACY" accent="bg-indigo-500"><div className="w-full text-lg font-black text-slate-900">Tracy</div></Card>
-          <Card title="TRISH" accent="bg-rose-500"><div className="w-full text-lg font-black text-slate-900">Trish</div></Card>
+          <Card title="TRACY" accent="bg-indigo-500"><div className="w-full text-lg font-black text-slate-900 tracking-tight">Tracy</div></Card>
+          <Card title="TRISH" accent="bg-rose-500"><div className="w-full text-lg font-black text-slate-900 tracking-tight">Trish</div></Card>
         </div>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Technical Setup</h2>
-        <Card title="Google Apps Script (v2.2 Engine)">
-          <p className="text-[10px] font-bold text-indigo-500 mb-2 leading-relaxed">
-            🚀 Enhanced Multi-Year Tab Engine!
-          </p>
-          <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
-            1. Copy the code below.<br/>
-            2. In Google Sheets: <strong>Extensions > Apps Script</strong>.<br/>
-            3. Replace ALL code and click <strong>Save</strong>.<br/>
-            4. <strong>CRITICAL:</strong> Click <strong>Deploy > New Deployment</strong>. Choose "Web App", set "Who has access" to <strong>Anyone</strong>, and hit <strong>Deploy</strong>.<br/>
-            5. Return here and click <strong>Sync Now</strong>.
-          </p>
-          <textarea 
-            readOnly 
-            className="w-full h-32 bg-slate-50 rounded-xl p-4 text-[9px] font-mono border-none outline-none mb-4"
-            value={GOOGLE_APPS_SCRIPT_CODE}
-          />
+        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Monthly Budgets</h2>
+        <Card title="Adjust Spending Limits">
+          <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar py-2">
+            {categories.map((cat: any) => (
+              <div key={cat.id} className="flex items-center gap-3">
+                <span className="w-8 text-center">{cat.icon}</span>
+                <span className="flex-1 text-[10px] font-black uppercase text-slate-500 tracking-tight">{cat.name}</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 font-bold">$</span>
+                  <input 
+                    type="number" 
+                    value={budgets[cat.name] || 0} 
+                    onChange={e => handleBudgetChange(cat.name, Number(e.target.value))}
+                    className="w-24 pl-6 pr-3 py-2 bg-slate-50 rounded-xl font-black text-right outline-none text-sm"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[8px] font-bold text-indigo-500 mt-4 uppercase tracking-widest text-center">Changes will sync to the cloud on next refresh.</p>
         </Card>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Data Sync</h2>
-        <Card title="Sync Controller">
-          <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className="w-full px-4 py-4 rounded-xl bg-slate-50 mb-4 outline-none font-bold text-sm" placeholder="Paste Apps Script URL here..." />
+        <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
+        <Card title="Script Engine v2.5 (Budget Sync)">
+          <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
+            1. Copy code. 2. Update Apps Script. 3. <strong>Deploy > New Deployment</strong>. 4. Paste NEW URL below.
+          </p>
+          <button 
+            onClick={handleCopy}
+            className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}
+          >
+            {copied ? '✅ Code Copied!' : '📋 Copy Script Code'}
+          </button>
+          
+          <div className="space-y-2 mt-6">
+            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Web App Deployment URL</label>
+            <input 
+              value={syncUrl} 
+              onChange={e => setSyncUrl(e.target.value)} 
+              className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} 
+              placeholder="Paste the NEW Web App URL here..." 
+            />
+          </div>
+
           <button onClick={async () => { 
-            if (!syncUrl) return alert("Please enter a Sync URL first.");
+            if (!syncUrl || !syncUrl.includes('exec')) return alert("Please enter a valid Web App URL (must end in /exec).");
             setIsSyncing(true); 
             try {
-              const d = await performSync(syncUrl, transactions); 
-              setTransactions(d.transactions); 
-              setLastSync(new Date().toLocaleTimeString()); 
+              const d = await performSync(syncUrl, transactions, budgets); 
+              if (d.transactions) {
+                setTransactions(d.transactions); 
+                if (d.budgets) setBudgets(d.budgets); // Sync budgets from cloud
+                setLastSync(new Date().toLocaleTimeString());
+                alert("Cloud Sync Successful! Budgets and Transactions are now in harmony.");
+              }
             } catch (err) {
-              alert("Sync failed: " + err.message + "\n\nTip: Ensure you did a 'New Deployment' set to 'Anyone'.");
+              alert("Sync failed: Check deployment settings.");
             }
             setIsSyncing(false); 
-          }} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all">{isSyncing ? 'Syncing...' : 'Sync Now'}</button>
-          <p className="text-[8px] font-black text-slate-300 uppercase mt-4 tracking-tighter text-center">Last synced: {lastSync}</p>
+          }} className="w-full mt-4 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all">
+            {isSyncing ? 'Syncing...' : 'Sync All Data Now'}
+          </button>
+          <p className="text-[8px] font-black text-slate-300 uppercase mt-4 tracking-tighter text-center">Last Cloud Update: {lastSync}</p>
         </Card>
       </section>
 
       <section className="pt-10 border-t border-slate-100">
-        <button onClick={() => { if(confirm("This will delete everything stored on this device. Are you sure?")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4">
-          Dangerous: Reset Local Cache
+        <button onClick={() => { if(confirm("Delete all local data? Cloud data will remain safe.")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4">
+          Reset Local Cache
         </button>
       </section>
     </div>
