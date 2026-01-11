@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.2</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.3</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -263,7 +263,7 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
         </Card>
       </section>
       <section className="pt-10">
-        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-500 transition-colors">
+        <button onClick={() => { if(confirm("This will clear all data on this phone. Continue?")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-500 transition-colors">
           Reset All Local Data
         </button>
       </section>
