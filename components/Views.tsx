@@ -16,30 +16,29 @@ export const Dashboard = memo(({
   const data = useMemo(() => {
     const totals: Record<string, number> = {};
     categories.forEach((c: any) => totals[c.name] = 0);
-    let totalCombined = 0, p1 = 0, p2 = 0;
+    let totalCombined = 0;
+    let tracyPaidThisMonth = 0;
 
     for (const t of transactions) {
-      if (t.userId === UserRole.PARTNER_1) p1 += t.totalAmount;
-      else p2 += t.totalAmount;
       const d = new Date(t.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         totalCombined += t.totalAmount;
+        if (t.userId === UserRole.PARTNER_1) tracyPaidThisMonth += t.totalAmount;
         for (const split of t.splits) {
           if (totals[split.categoryName] !== undefined) totals[split.categoryName] += split.amount;
         }
       }
     }
-    return { totals, totalCombined, p1, p2 };
-  }, [transactions, categories, currentMonth, currentYear]);
 
-  const diff = data.p1 - data.p2;
-  const settlementMsg = diff === 0 ? "Balanced ✨" : `${partnerNames[diff > 0 ? UserRole.PARTNER_2 : UserRole.PARTNER_1]} owes $${(Math.abs(diff)/2).toFixed(2)}`;
+    const tracyOwesThisMonth = (totalCombined - tracyPaidThisMonth) * 0.45;
+    return { totals, totalCombined, tracyOwesThisMonth };
+  }, [transactions, categories, currentMonth, currentYear]);
 
   return (
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v2.8</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.0</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -51,8 +50,13 @@ export const Dashboard = memo(({
       </header>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Card title="Shared Equity" accent="bg-indigo-500">
-            <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{settlementMsg}</span>
+          <Card title="Shared Equity (This Month)" accent="bg-indigo-500">
+            <div className="space-y-1">
+              <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                Tracy owes ${data.tracyOwesThisMonth.toFixed(2)}
+              </span>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Resets every 1st of the month</p>
+            </div>
           </Card>
           <Card title="Monthly Combined" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-xl">
             <div className="text-5xl font-black tracking-tighter">${data.totalCombined.toFixed(2)}</div>
@@ -281,7 +285,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v2.8 (Generic Labels)">
+        <Card title="Script Engine v3.0 (Sheet Cleanup)">
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
             1. Copy code. 2. Update Apps Script. 3. <strong>Deploy > New Deployment</strong>. 4. Paste NEW URL below.
           </p>
@@ -293,7 +297,7 @@ export const SettingsView = memo(({
           </button>
           
           <p className="text-[9px] text-indigo-500 mt-2 font-bold px-1">
-            ✨ UPDATED: Calculation labels simplified for future flexibility!
+            ✨ UPDATED: Sheet1 and old "Monthly summary" tabs are now aggressively removed for a cleaner experience!
           </p>
 
           <div className="space-y-2 mt-6">
@@ -315,7 +319,7 @@ export const SettingsView = memo(({
                 setTransactions(d.transactions); 
                 if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Cloud Sync Successful! Spreadsheet labels updated to v2.8.");
+                alert("Cloud Sync Successful! v3.0 cleanup has been applied to your sheet.");
               }
             } catch (err) {
               alert("Sync failed: Check deployment settings.");

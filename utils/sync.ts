@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.8 (Clean Labels) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.0 (Aggressive Cleanup) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -21,7 +21,7 @@ function doPost(e) {
       updateYearlySummarySheets(ss, txs);
     }
 
-    // 2. Update Budgets (Source of Truth)
+    // 2. Update Budgets
     if (budgets && typeof budgets === 'object') {
       budgetSheet.clear();
       budgetSheet.appendRow(["Category", "Monthly Limit"]);
@@ -34,9 +34,22 @@ function doPost(e) {
       }
     }
 
-    // 3. Cleanup
+    // 3. AGGRESSIVE CLEANUP
+    // Delete the default "Sheet1" if it exists and we have other sheets
     const sheet1 = ss.getSheetByName("Sheet1");
-    if (sheet1 && sheet1.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
+    if (sheet1 && ss.getSheets().length > 1) {
+      ss.deleteSheet(sheet1);
+    }
+
+    // Delete legacy/old "Monthly summary" tabs from previous versions to avoid clutter
+    const allSheets = ss.getSheets();
+    allSheets.forEach(s => {
+      const name = s.getName();
+      if (name.toLowerCase().includes("monthly summary") && !name.includes("20")) {
+        // If it's a generic "Monthly summary" without a year, it might be old
+        if (ss.getSheets().length > 1) ss.deleteSheet(s);
+      }
+    });
     
     return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -46,7 +59,7 @@ function doPost(e) {
 
 function updateYearlySummarySheets(ss, txs) {
   const yearMap = {}; 
-  const userMonthMap = {}; // Track monthly spending by user
+  const userMonthMap = {}; 
   const allCategories = new Set();
   
   txs.forEach(t => {
@@ -63,7 +76,6 @@ function updateYearlySummarySheets(ss, txs) {
       };
     }
     
-    // Track how much Tracy (PARTNER_1) or Trish (PARTNER_2) paid
     userMonthMap[year][t.userId][monthIdx] += Number(t.totalAmount) || 0;
 
     t.splits.forEach(s => {
@@ -94,7 +106,6 @@ function updateYearlySummarySheets(ss, txs) {
       }
     });
 
-    // Monthly Totals
     const totalRow = ["GRAND TOTAL"];
     for (let m = 0; m < 12; m++) {
       let monthSum = 0;
@@ -106,7 +117,6 @@ function updateYearlySummarySheets(ss, txs) {
     totalRow.push(totalRow.slice(1).reduce((a, b) => a + b, 0));
     sheet.appendRow(totalRow);
 
-    // Tracy Owes Calculation: (Total - Tracy Paid) * 45%
     const tracyPaidRow = ["Tracy Paid (Actual)"];
     const tracyOwesRow = ["Tracy owes"];
     
@@ -131,13 +141,12 @@ function updateYearlySummarySheets(ss, txs) {
     sheet.appendRow(tracyPaidRow);
     sheet.appendRow(tracyOwesRow);
 
-    // Styling
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f8fafc");
-    sheet.getRange(lastRow - 2, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9"); // Grand Total
-    sheet.getRange(lastRow - 1, 1, 1, lastCol).setFontStyle("italic").setFontColor("#64748b"); // Tracy Paid
-    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#eef2ff").setFontColor("#4f46e5"); // Tracy Owes
+    sheet.getRange(lastRow - 2, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
+    sheet.getRange(lastRow - 1, 1, 1, lastCol).setFontStyle("italic").setFontColor("#64748b");
+    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#eef2ff").setFontColor("#4f46e5");
     sheet.getRange(2, 2, lastRow, lastCol).setNumberFormat("$#,##0.00");
     sheet.setFrozenRows(1);
     sheet.setFrozenColumns(1);
