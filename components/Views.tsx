@@ -39,7 +39,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.7</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v1.8</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -243,9 +243,12 @@ export const SettingsView = memo(({ partnerNames, syncUrl, setSyncUrl, lastSync,
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Technical Setup</h2>
-        <Card title="Google Apps Script (v1.7)">
+        <Card title="Google Apps Script (v1.8 Update)">
+          <p className="text-[10px] font-bold text-indigo-500 mb-2 leading-relaxed">
+            ✨ Multi-Year Support Added!
+          </p>
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
-            Copy the updated script code below into your Google Sheet's Apps Script editor and Re-Deploy to see the new Summary tab.
+            Copy the updated script code below into your Google Sheet's Apps Script editor and Re-Deploy to separate your spending by Year.
           </p>
           <textarea 
             readOnly 
