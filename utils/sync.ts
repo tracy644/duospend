@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.7 (Refined Equity Engine) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.8 (Clean Labels) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -108,7 +108,7 @@ function updateYearlySummarySheets(ss, txs) {
 
     // Tracy Owes Calculation: (Total - Tracy Paid) * 45%
     const tracyPaidRow = ["Tracy Paid (Actual)"];
-    const tracyOwesRow = ["Tracy owes (45% of remainder)"];
+    const tracyOwesRow = ["Tracy owes"];
     
     let yearTracyPaid = 0;
     let yearTracyOwes = 0;
