@@ -20,8 +20,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   [Category.DINING_OUT]: '#be123c',
   [Category.PETS]: '#854d0e',
   [Category.HOUSE_REPAIRS]: '#7c2d12',
-  [Category.ONE_TIME]: '#4b5563',
-  [Category.RENT]: '#6366f1'
+  [Category.ONE_TIME]: '#4b5563'
 };
 
 export const CATEGORY_ICONS: Record<string, string> = {
@@ -43,6 +42,5 @@ export const CATEGORY_ICONS: Record<string, string> = {
   [Category.DINING_OUT]: '🍽️',
   [Category.PETS]: '🐾',
   [Category.HOUSE_REPAIRS]: '🏠',
-  [Category.ONE_TIME]: '📦',
-  [Category.RENT]: '🔑'
+  [Category.ONE_TIME]: '📦'
 };

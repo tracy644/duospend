@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.0 (Aggressive Cleanup) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.2 (Timezone Alignment) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -35,18 +35,15 @@ function doPost(e) {
     }
 
     // 3. AGGRESSIVE CLEANUP
-    // Delete the default "Sheet1" if it exists and we have other sheets
     const sheet1 = ss.getSheetByName("Sheet1");
     if (sheet1 && ss.getSheets().length > 1) {
       ss.deleteSheet(sheet1);
     }
 
-    // Delete legacy/old "Monthly summary" tabs from previous versions to avoid clutter
     const allSheets = ss.getSheets();
     allSheets.forEach(s => {
       const name = s.getName();
       if (name.toLowerCase().includes("monthly summary") && !name.includes("20")) {
-        // If it's a generic "Monthly summary" without a year, it might be old
         if (ss.getSheets().length > 1) ss.deleteSheet(s);
       }
     });
@@ -65,8 +62,9 @@ function updateYearlySummarySheets(ss, txs) {
   txs.forEach(t => {
     const d = new Date(t.date);
     if (isNaN(d.getTime())) return;
-    const year = d.getFullYear();
-    const monthIdx = d.getMonth(); 
+    // CRITICAL: Use UTC to match the ISO storage format in the App
+    const year = d.getUTCFullYear();
+    const monthIdx = d.getUTCMonth(); 
     
     if (!yearMap[year]) yearMap[year] = {};
     if (!userMonthMap[year]) {

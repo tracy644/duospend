@@ -10,8 +10,8 @@ export const Dashboard = memo(({
   transactions, budgets, categories, partnerNames, goals, isSynced, lastSync 
 }: any) => {
   const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
+  const currentMonth = now.getUTCMonth(); // Using UTC for alignment
+  const currentYear = now.getUTCFullYear();
 
   const data = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -21,7 +21,8 @@ export const Dashboard = memo(({
 
     for (const t of transactions) {
       const d = new Date(t.date);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      // Filter using UTC methods to match the Spreadsheet logic exactly
+      if (d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear) {
         totalCombined += t.totalAmount;
         if (t.userId === UserRole.PARTNER_1) tracyPaidThisMonth += t.totalAmount;
         for (const split of t.splits) {
@@ -31,14 +32,14 @@ export const Dashboard = memo(({
     }
 
     const tracyOwesThisMonth = (totalCombined - tracyPaidThisMonth) * 0.45;
-    return { totals, totalCombined, tracyOwesThisMonth };
+    return { totals, totalCombined, tracyPaidThisMonth, tracyOwesThisMonth };
   }, [transactions, categories, currentMonth, currentYear]);
 
   return (
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.0</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.2</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -51,11 +52,27 @@ export const Dashboard = memo(({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-6">
           <Card title="Shared Equity (This Month)" accent="bg-indigo-500">
-            <div className="space-y-1">
-              <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                Tracy owes ${data.tracyOwesThisMonth.toFixed(2)}
-              </span>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Resets every 1st of the month</p>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                  Tracy owes ${data.tracyOwesThisMonth.toFixed(2)}
+                </span>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Resets every 1st of the month (UTC)</p>
+              </div>
+              <div className="pt-3 border-t border-slate-50 space-y-1">
+                <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
+                  <span>Combined Total:</span>
+                  <span>${data.totalCombined.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
+                  <span>Tracy Paid:</span>
+                  <span>-${data.tracyPaidThisMonth.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[9px] font-black uppercase text-indigo-500">
+                  <span>45% of Remainder:</span>
+                  <span>${data.tracyOwesThisMonth.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           </Card>
           <Card title="Monthly Combined" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-xl">
@@ -285,7 +302,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.0 (Sheet Cleanup)">
+        <Card title="Script Engine v3.2 (Timezone Fix)">
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
             1. Copy code. 2. Update Apps Script. 3. <strong>Deploy > New Deployment</strong>. 4. Paste NEW URL below.
           </p>
@@ -297,7 +314,7 @@ export const SettingsView = memo(({
           </button>
           
           <p className="text-[9px] text-indigo-500 mt-2 font-bold px-1">
-            ✨ UPDATED: Sheet1 and old "Monthly summary" tabs are now aggressively removed for a cleaner experience!
+            ✨ SYNC FIX: Logic updated to UTC to ensure the app and spreadsheet never drift!
           </p>
 
           <div className="space-y-2 mt-6">
@@ -319,7 +336,7 @@ export const SettingsView = memo(({
                 setTransactions(d.transactions); 
                 if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Cloud Sync Successful! v3.0 cleanup has been applied to your sheet.");
+                alert("Cloud Sync Successful! UTC Timezone alignment applied.");
               }
             } catch (err) {
               alert("Sync failed: Check deployment settings.");

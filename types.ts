@@ -25,8 +25,7 @@ export enum Category {
   DINING_OUT = 'Dining out',
   PETS = 'pets',
   HOUSE_REPAIRS = 'House repairs/ Garage',
-  ONE_TIME = 'One time things',
-  RENT = 'Rent'
+  ONE_TIME = 'One time things'
 }
 
 export enum UserRole {
