@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
 import { analyzeSpending } from '../services/geminiService';
@@ -6,16 +7,27 @@ import { GOOGLE_APPS_SCRIPT_CODE, performSync } from '../utils/sync';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
+// Define prop interfaces for type safety
+interface DashboardProps {
+  transactions: Transaction[];
+  budgets: Record<string, number>;
+  categories: CategoryDefinition[];
+  partnerNames: PartnerNames;
+  goals: Goal[];
+  isSynced: boolean;
+  lastSync: string;
+}
+
 export const Dashboard = memo(({ 
   transactions, budgets, categories, partnerNames, goals, isSynced, lastSync 
-}: any) => {
+}: DashboardProps) => {
   const now = new Date();
   const currentMonth = now.getUTCMonth(); 
   const currentYear = now.getUTCFullYear();
 
   const data = useMemo(() => {
     const totals: Record<string, number> = {};
-    categories.forEach((c: any) => totals[c.name] = 0);
+    categories.forEach((c: CategoryDefinition) => totals[c.name] = 0);
     let totalCombined = 0;
     let tracyPaidThisMonth = 0;
 
@@ -30,10 +42,12 @@ export const Dashboard = memo(({
       }
     }
 
-    const totalBudget = Object.values(budgets).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0);
-    const tracyOwesThisMonth = (totalCombined - tracyPaidThisMonth) * 0.45;
+    // Explicitly define types to avoid 'left-hand side of arithmetic operation' errors
+    const totalBudget: number = Object.values(budgets).reduce((acc: number, val: number) => acc + (val || 0), 0);
+    const tracyOwesThisMonth: number = (totalCombined - tracyPaidThisMonth) * 0.45;
+    const remainingBudget: number = Math.max(0, totalBudget - totalCombined);
     
-    return { totals, totalCombined, totalBudget, tracyPaidThisMonth, tracyOwesThisMonth };
+    return { totals, totalCombined, totalBudget, tracyPaidThisMonth, tracyOwesThisMonth, remainingBudget };
   }, [transactions, categories, budgets, currentMonth, currentYear]);
 
   return (
@@ -50,47 +64,49 @@ export const Dashboard = memo(({
           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{lastSync}</p>
         </div>
       </header>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Card title="Shared Equity (This Month)" accent="bg-indigo-500">
+          <Card title="Total Spent This Month" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-xl">
+            <div className="text-5xl font-black tracking-tighter mb-1">${data.totalCombined.toFixed(2)}</div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Combined logs so far</p>
+          </Card>
+          
+          <Card title="Shared Equity Status" accent="bg-indigo-500">
             <div className="space-y-3">
               <div className="space-y-1">
                 <span className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
                   Tracy owes ${data.tracyOwesThisMonth.toFixed(2)}
                 </span>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Resets every 1st of the month (UTC)</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Target: 45% of partner expenses</p>
               </div>
               <div className="pt-3 border-t border-slate-50 space-y-1">
                 <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
-                  <span>Combined Total:</span>
-                  <span>${data.totalCombined.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
                   <span>Tracy Paid:</span>
-                  <span>-${data.tracyPaidThisMonth.toFixed(2)}</span>
+                  <span>${data.tracyPaidThisMonth.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-black uppercase text-indigo-500">
-                  <span>Equity Remainder:</span>
+                  <span>Settlement Due:</span>
                   <span>${data.tracyOwesThisMonth.toFixed(2)}</span>
                 </div>
               </div>
             </div>
           </Card>
-          <Card title="Monthly Combined" accent="bg-slate-900" className="bg-slate-900 text-white border-none shadow-xl">
-            <div className="text-5xl font-black tracking-tighter">${data.totalCombined.toFixed(2)}</div>
-          </Card>
         </div>
+
         <Card title="Budget Health">
           <div className="space-y-5 py-2">
-            <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="flex justify-between items-end mb-2">
+            <div className="mb-6 p-5 bg-slate-50 rounded-[24px] border border-slate-100">
+              <div className="flex justify-between items-end mb-3">
                 <div>
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Monthly Spent</p>
-                  <p className="text-2xl font-black text-slate-900">${data.totalCombined.toFixed(2)}</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Spent / Budget</p>
+                  <p className="text-2xl font-black text-slate-900">
+                    ${data.totalCombined.toFixed(0)} <span className="text-slate-300 font-normal text-lg">/ ${data.totalBudget.toFixed(0)}</span>
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Combined Budget</p>
-                  <p className="text-sm font-bold text-slate-600">${data.totalBudget.toFixed(0)}</p>
+                  <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Remaining</p>
+                  <p className="text-sm font-black text-emerald-600">${data.remainingBudget.toFixed(0)}</p>
                 </div>
               </div>
               <ProgressBar 
@@ -99,15 +115,15 @@ export const Dashboard = memo(({
               />
             </div>
             
-            <div className="max-h-[300px] overflow-y-auto no-scrollbar space-y-5">
-              {categories.map((cat: any) => {
+            <div className="max-h-[300px] overflow-y-auto no-scrollbar space-y-5 pr-1">
+              {categories.map((cat: CategoryDefinition) => {
                 const spent = data.totals[cat.name] || 0;
                 const budget = budgets[cat.name] || 0;
                 return (
                   <div key={cat.id} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-[9px] font-black uppercase text-slate-500">{cat.icon} {cat.name}</span>
-                      <span className="text-[10px] font-black">${spent.toFixed(0)} / ${budget.toFixed(0)}</span>
+                      <span className="text-[10px] font-black text-slate-900">${spent.toFixed(0)} <span className="text-slate-300 font-normal">/ ${budget.toFixed(0)}</span></span>
                     </div>
                     <ProgressBar progress={(spent / (budget || 1)) * 100} color={spent > budget ? '#f43f5e' : cat.color} />
                   </div>
@@ -121,7 +137,16 @@ export const Dashboard = memo(({
   );
 });
 
-export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: any) => {
+interface TransactionListProps {
+  transactions: Transaction[];
+  categories: CategoryDefinition[];
+  partnerNames: PartnerNames;
+  onAdd: (t: Transaction) => void;
+  onDelete: (id: string) => void;
+  isAIEnabled: boolean;
+}
+
+export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: TransactionListProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [newUser, setNewUser] = useState(UserRole.PARTNER_1);
@@ -170,11 +195,11 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
         {groups.map(([date, txs]) => (
           <div key={date} className="space-y-4">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{date}</h3>
-            {txs.map((t: any) => (
+            {txs.map((t: Transaction) => (
               <div key={t.id} className="bg-white p-5 rounded-[24px] border border-slate-50 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">
-                    {categories.find((c: any) => c.name === t.splits[0]?.categoryName)?.icon || '💰'}
+                    {categories.find((c: CategoryDefinition) => c.name === t.splits[0]?.categoryName)?.icon || '💰'}
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{t.description}</h4>
@@ -223,7 +248,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
                       updated[index].categoryName = e.target.value;
                       setNewSplits(updated);
                     }} className="flex-1 px-4 py-4 rounded-2xl bg-slate-50 font-bold outline-none text-sm">
-                      {categories.map((c: any) => <option key={c.id} value={c.name}>{c.icon} {c.name}</option>)}
+                      {categories.map((c: CategoryDefinition) => <option key={c.id} value={c.name}>{c.icon} {c.name}</option>)}
                     </select>
                     <input type="number" step="0.01" required value={split.amount || ''} onChange={e => {
                       const updated = [...newSplits];
@@ -253,7 +278,14 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   );
 });
 
-export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }: any) => {
+interface AIAdvisorProps {
+  transactions: Transaction[];
+  budgets: Record<string, number>;
+  categories: CategoryDefinition[];
+  isEnabled: boolean;
+}
+
+export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }: AIAdvisorProps) => {
   const [advice, setAdvice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   return (
@@ -268,9 +300,22 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
   );
 });
 
+interface SettingsViewProps {
+  partnerNames: PartnerNames;
+  budgets: Record<string, number>;
+  setBudgets: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  categories: CategoryDefinition[];
+  syncUrl: string;
+  setSyncUrl: (url: string) => void;
+  lastSync: string;
+  setLastSync: (time: string) => void;
+  transactions: Transaction[];
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+}
+
 export const SettingsView = memo(({ 
   partnerNames, budgets, setBudgets, categories, syncUrl, setSyncUrl, lastSync, setLastSync, transactions, setTransactions 
-}: any) => {
+}: SettingsViewProps) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -281,7 +326,7 @@ export const SettingsView = memo(({
   };
 
   const handleBudgetChange = (catName: string, amount: number) => {
-    setBudgets((prev: any) => ({ ...prev, [catName]: amount }));
+    setBudgets((prev: Record<string, number>) => ({ ...prev, [catName]: amount }));
   };
 
   const handleClearTransactions = () => {
@@ -307,7 +352,7 @@ export const SettingsView = memo(({
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Monthly Budgets</h2>
         <Card title="Adjust Spending Limits">
           <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar py-2">
-            {categories.map((cat: any) => (
+            {categories.map((cat: CategoryDefinition) => (
               <div key={cat.id} className="flex items-center gap-3">
                 <span className="w-8 text-center">{cat.icon}</span>
                 <span className="flex-1 text-[10px] font-black uppercase text-slate-500 tracking-tight">{cat.name}</span>
