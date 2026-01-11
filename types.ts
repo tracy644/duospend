@@ -1,4 +1,3 @@
-
 export interface CategoryDefinition {
   id: string;
   name: string;

@@ -1,4 +1,3 @@
-
 import { Category } from './types';
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -41,6 +40,6 @@ export const CATEGORY_ICONS: Record<string, string> = {
   [Category.BEERS]: '🍺',
   [Category.DINING_OUT]: '🍽️',
   [Category.PETS]: '🐾',
-  [Category.HOUSE_REPAIRS]: '🏠',
+  [Category.HOUSE_REPAIRS]: '🔨',
   [Category.ONE_TIME]: '📦'
 };

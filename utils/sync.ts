@@ -1,6 +1,37 @@
+
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.3 (Aligned & Clean) **/
+/**
+ * Synchronizes local data with Google Sheets via a Google Apps Script web app.
+ * Sends local transactions and budgets via POST, then fetches the updated cloud state via GET.
+ */
+export const performSync = async (url: string, transactions: Transaction[], budgets: Record<string, number>) => {
+  try {
+    // 1. Push local changes to the cloud via POST
+    // We use Content-Type: text/plain to minimize CORS preflight issues with Google Apps Script deployments
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ transactions, budgets }),
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+    });
+
+    // 2. Fetch the latest state from the cloud via GET
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Cloud sync failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("DuoSpend Sync Error:", error);
+    throw error;
+  }
+};
+
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.5 (Strict & Clean) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -177,20 +208,3 @@ function doGet() {
 
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
 }`;
-
-export const performSync = async (url: string, transactions: Transaction[], budgets: Record<string, number>) => {
-  if (!url) throw new Error("Sync URL missing");
-  const postResponse = await fetch(url, { 
-    method: 'POST', 
-    headers: { 'Content-Type': 'text/plain' }, 
-    body: JSON.stringify({ transactions, budgets }) 
-  });
-  
-  const postResult = await postResponse.json();
-  if (postResult.status === 'error') {
-    throw new Error("Script Error: " + postResult.message);
-  }
-
-  const res = await fetch(url);
-  return await res.json();
-};

@@ -44,10 +44,18 @@ const App: React.FC = () => {
   
   const [budgets, setBudgets] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('ds_budgets');
-    if (saved) return JSON.parse(saved);
-    const initial: Record<string, number> = {};
-    DEFAULT_CATEGORIES.forEach(c => initial[c.name] = 100);
-    return initial;
+    let b = saved ? JSON.parse(saved) : {};
+    
+    // STRICT SANITIZATION: Explicitly remove Rent if it exists in old cache
+    delete b['Rent'];
+    delete b['rent'];
+    delete b['RENT'];
+    
+    // Ensure all defined categories have at least a default budget
+    DEFAULT_CATEGORIES.forEach(c => {
+      if (b[c.name] === undefined) b[c.name] = 100;
+    });
+    return b;
   });
 
   const [goals, setGoals] = useState<Goal[]>(() => {

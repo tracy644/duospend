@@ -10,7 +10,7 @@ export const Dashboard = memo(({
   transactions, budgets, categories, partnerNames, goals, isSynced, lastSync 
 }: any) => {
   const now = new Date();
-  const currentMonth = now.getUTCMonth(); // Using UTC for alignment
+  const currentMonth = now.getUTCMonth(); 
   const currentYear = now.getUTCFullYear();
 
   const data = useMemo(() => {
@@ -21,7 +21,6 @@ export const Dashboard = memo(({
 
     for (const t of transactions) {
       const d = new Date(t.date);
-      // Filter using UTC methods to match the Spreadsheet logic exactly
       if (d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear) {
         totalCombined += t.totalAmount;
         if (t.userId === UserRole.PARTNER_1) tracyPaidThisMonth += t.totalAmount;
@@ -39,7 +38,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.3</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.5</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -264,6 +263,13 @@ export const SettingsView = memo(({
     setBudgets((prev: any) => ({ ...prev, [catName]: amount }));
   };
 
+  const handleClearTransactions = () => {
+    if (confirm("Delete all local transactions? This cannot be undone. You must Sync afterward to clear the cloud.")) {
+      setTransactions([]);
+      alert("Local transactions cleared. Click 'Sync All Data Now' to update your spreadsheet.");
+    }
+  };
+
   return (
     <div className="space-y-10 animate-in pt-10 pb-10">
       <header><h1 className="text-4xl font-black text-slate-900 tracking-tight">Setup</h1></header>
@@ -302,7 +308,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-xl font-black tracking-tight text-slate-400 uppercase text-[10px] tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.3 (Aligned & Final)">
+        <Card title="Script Engine v3.5 (Final Release)">
           <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">
             1. Copy code. 2. Update Apps Script. 3. <strong>Deploy &gt; New Deployment</strong>. 4. Paste NEW URL below.
           </p>
@@ -313,10 +319,6 @@ export const SettingsView = memo(({
             {copied ? '✅ Code Copied!' : '📋 Copy Script Code'}
           </button>
           
-          <p className="text-[9px] text-indigo-500 mt-2 font-bold px-1">
-            ✨ SYNC READY: Final v3.3 build ensures UTC alignment and perfect version matching.
-          </p>
-
           <div className="space-y-2 mt-6">
             <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Web App Deployment URL</label>
             <input 
@@ -336,7 +338,7 @@ export const SettingsView = memo(({
                 setTransactions(d.transactions); 
                 if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Cloud Sync Successful! App and Spreadsheet are now at v3.3.");
+                alert("Cloud Sync Successful! Database is synchronized.");
               }
             } catch (err) {
               alert("Sync failed: Check deployment settings.");
@@ -349,10 +351,22 @@ export const SettingsView = memo(({
         </Card>
       </section>
 
-      <section className="pt-10 border-t border-slate-100">
-        <button onClick={() => { if(confirm("Delete all local data? Cloud data will remain safe.")) { localStorage.clear(); window.location.reload(); } }} className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4">
-          Reset Local Cache
-        </button>
+      <section className="space-y-4 pt-4">
+        <h2 className="text-xl font-black tracking-tight text-rose-500 uppercase text-[10px] tracking-[0.2em]">Maintenance / Fresh Start</h2>
+        <div className="space-y-3">
+          <button 
+            onClick={handleClearTransactions}
+            className="w-full bg-rose-50 text-rose-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all"
+          >
+            🗑️ Wipe All Transactions
+          </button>
+          <button 
+            onClick={() => { if(confirm("Delete all local cache (including sync URL and budgets)? Cloud data will remain safe.")) { localStorage.clear(); window.location.reload(); } }} 
+            className="w-full text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-400 transition-colors py-4"
+          >
+            Reset App Cache
+          </button>
+        </div>
       </section>
     </div>
   );
