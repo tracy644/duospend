@@ -1,6 +1,6 @@
 import { Transaction } from '../types';
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.6 (Equity Split Engine) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v2.7 (Refined Equity Engine) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -29,7 +29,9 @@ function doPost(e) {
         budgetSheet.appendRow([cat, amt]);
       });
       budgetSheet.getRange(1,1,1,2).setFontWeight("bold").setBackground("#f8fafc");
-      budgetSheet.getRange(2,2,budgetSheet.getLastRow(),1).setNumberFormat("$#,##0");
+      if (budgetSheet.getLastRow() > 1) {
+        budgetSheet.getRange(2,2,budgetSheet.getLastRow()-1,1).setNumberFormat("$#,##0");
+      }
     }
 
     // 3. Cleanup
@@ -44,13 +46,26 @@ function doPost(e) {
 
 function updateYearlySummarySheets(ss, txs) {
   const yearMap = {}; 
+  const userMonthMap = {}; // Track monthly spending by user
   const allCategories = new Set();
+  
   txs.forEach(t => {
     const d = new Date(t.date);
     if (isNaN(d.getTime())) return;
     const year = d.getFullYear();
     const monthIdx = d.getMonth(); 
+    
     if (!yearMap[year]) yearMap[year] = {};
+    if (!userMonthMap[year]) {
+      userMonthMap[year] = {
+        "PARTNER_1": new Array(12).fill(0),
+        "PARTNER_2": new Array(12).fill(0)
+      };
+    }
+    
+    // Track how much Tracy (PARTNER_1) or Trish (PARTNER_2) paid
+    userMonthMap[year][t.userId][monthIdx] += Number(t.totalAmount) || 0;
+
     t.splits.forEach(s => {
       const cat = s.categoryName;
       allCategories.add(cat);
@@ -79,33 +94,50 @@ function updateYearlySummarySheets(ss, txs) {
       }
     });
 
-    // Calculate Grand Totals
+    // Monthly Totals
     const totalRow = ["GRAND TOTAL"];
-    let grandTotal = 0;
     for (let m = 0; m < 12; m++) {
       let monthSum = 0;
       catsSorted.forEach(cat => {
         if (yearData[cat]) monthSum += yearData[cat][m];
       });
       totalRow.push(monthSum);
-      grandTotal += monthSum;
     }
-    totalRow.push(grandTotal);
+    totalRow.push(totalRow.slice(1).reduce((a, b) => a + b, 0));
     sheet.appendRow(totalRow);
 
-    // Calculate Tracy Owes (45% of Total)
-    const tracyOwesRow = ["Tracy owes (45%)"];
-    for (let m = 1; m < totalRow.length; m++) {
-      tracyOwesRow.push(Number(totalRow[m]) * 0.45);
+    // Tracy Owes Calculation: (Total - Tracy Paid) * 45%
+    const tracyPaidRow = ["Tracy Paid (Actual)"];
+    const tracyOwesRow = ["Tracy owes (45% of remainder)"];
+    
+    let yearTracyPaid = 0;
+    let yearTracyOwes = 0;
+
+    for (let m = 0; m < 12; m++) {
+      const monthTotal = totalRow[m + 1];
+      const tracyPaid = userMonthMap[year]["PARTNER_1"][m];
+      const tracyOwes = (monthTotal - tracyPaid) * 0.45;
+      
+      tracyPaidRow.push(tracyPaid);
+      tracyOwesRow.push(tracyOwes);
+      
+      yearTracyPaid += tracyPaid;
+      yearTracyOwes += tracyOwes;
     }
+    
+    tracyPaidRow.push(yearTracyPaid);
+    tracyOwesRow.push(yearTracyOwes);
+    
+    sheet.appendRow(tracyPaidRow);
     sheet.appendRow(tracyOwesRow);
 
     // Styling
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f8fafc");
-    sheet.getRange(lastRow - 1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
-    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#eef2ff").setFontColor("#4f46e5");
+    sheet.getRange(lastRow - 2, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9"); // Grand Total
+    sheet.getRange(lastRow - 1, 1, 1, lastCol).setFontStyle("italic").setFontColor("#64748b"); // Tracy Paid
+    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#eef2ff").setFontColor("#4f46e5"); // Tracy Owes
     sheet.getRange(2, 2, lastRow, lastCol).setNumberFormat("$#,##0.00");
     sheet.setFrozenRows(1);
     sheet.setFrozenColumns(1);
