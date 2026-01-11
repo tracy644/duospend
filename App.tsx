@@ -11,7 +11,7 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = Object.values(Category).map((ca
   icon: CATEGORY_ICONS[catName] || '💰'
 }));
 
-// Hardcoded names for Tracy and Trish
+// Strictly Hardcoded Names
 const PARTNER_NAMES: PartnerNames = {
   [UserRole.PARTNER_1]: 'Tracy',
   [UserRole.PARTNER_2]: 'Trish',
