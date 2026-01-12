@@ -76,7 +76,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.4</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.5</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -124,7 +124,7 @@ export const Dashboard = memo(({
              <div className="mt-6 self-end">
                 <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <svg className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" />
                   </svg>
                 </div>
              </div>
@@ -178,7 +178,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newSplits, setNewSplits] = useState<TransactionSplit[]>([{ categoryName: categories[0]?.name || '', amount: 0 }]);
   
-  const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), [newSplits]), [newSplits]);
+  const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [newSplits]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -437,7 +437,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v4.4">
+        <Card title="Script Engine v4.5">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
@@ -462,7 +462,7 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-6 pt-4 text-center">
-        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.4)</button>
+        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.5)</button>
         <button onClick={handleClearTransactions} className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-4">🗑️ Wipe Local Data</button>
       </section>
     </div>

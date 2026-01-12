@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <!-- DuoSpend v4.4 Build - The "Forced Refresh" Edition -->
+  <!-- DuoSpend v4.5 Build - The "Bug Fix" Edition -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,7 +15,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <title>DuoSpend v4.4</title>
+  <title>DuoSpend v4.5</title>
   
   <!-- Manifest for "Add to Home Screen" -->
   <link rel="manifest" href="manifest.json">
@@ -59,7 +59,7 @@
   <!-- Anti-Cache script: Specifically targets Service Workers which cause "stuck" PWAs -->
   <script>
     (function() {
-      const CURRENT_V = '4.4';
+      const CURRENT_V = '4.5';
       const storedV = localStorage.getItem('ds_app_version');
 
       // 1. Force unregister any service workers from old versions
@@ -108,9 +108,9 @@
 }
 </script>
 </head>
-<body class="safe-top" data-v="4.4">
+<body class="safe-top" data-v="4.5">
   <div id="root"></div>
   <!-- Nuclear Cache Buster Query String -->
-  <script type="module" src="index.tsx?v=4.4"></script>
+  <script type="module" src="index.tsx?v=4.5"></script>
 </body>
 </html>
