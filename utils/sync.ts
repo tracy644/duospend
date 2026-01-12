@@ -2,28 +2,37 @@
 import { Transaction } from '../types';
 
 /**
- * Synchronizes local data with Google Sheets via a Google Apps Script web app.
- * Sends local transactions and budgets via POST, then fetches the updated cloud state via GET.
+ * Atomic Synchronization: Sends local data and gets the full cloud state back in ONE request.
+ * This prevents race conditions where a GET might return empty data before the POST finishes.
  */
 export const performSync = async (url: string, transactions: Transaction[], budgets: Record<string, number>) => {
   try {
-    // 1. Push local changes to the cloud via POST
-    // We use Content-Type: text/plain to minimize CORS preflight issues with Google Apps Script deployments
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify({ transactions, budgets }),
+      body: JSON.stringify({ transactions, budgets, action: 'sync' }),
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
       },
     });
 
-    // 2. Fetch the latest state from the cloud via GET
-    const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Cloud sync failed: ${response.status} ${response.statusText}`);
+      throw new Error(`Cloud sync failed: ${response.status}`);
     }
     
     const data = await response.json();
+    
+    if (data.status === "error") {
+      throw new Error(data.message || "Server error during sync");
+    }
+
+    // Safety check: If cloud is empty but we have local data, ask before overwriting
+    if (transactions.length > 0 && (!data.transactions || data.transactions.length === 0)) {
+      const confirmWipe = confirm("Cloud storage is empty. Do you want to WIPE your local data to match the cloud? Click 'Cancel' to keep your local data and try syncing again later.");
+      if (!confirmWipe) {
+        return { transactions, budgets }; // Keep local
+      }
+    }
+
     return data;
   } catch (error) {
     console.error("DuoSpend Sync Error:", error);
@@ -31,7 +40,7 @@ export const performSync = async (url: string, transactions: Transaction[], budg
   }
 };
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.5 (Strict & Clean) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.8 (Atomic & Safe) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -42,8 +51,8 @@ function doPost(e) {
     const txs = data.transactions;
     const budgets = data.budgets;
     
-    // 1. Update Transactions
-    if (txs && Array.isArray(txs)) {
+    // 1. Update Transactions (Only if provided)
+    if (txs && Array.isArray(txs) && txs.length > 0) {
       txSheet.clear();
       txSheet.appendRow(["ID", "Date", "Description", "User", "Total Amount", "SplitsJSON"]);
       txs.forEach(t => {
@@ -53,36 +62,50 @@ function doPost(e) {
     }
 
     // 2. Update Budgets
-    if (budgets && typeof budgets === 'object') {
+    if (budgets && typeof budgets === 'object' && Object.keys(budgets).length > 0) {
       budgetSheet.clear();
       budgetSheet.appendRow(["Category", "Monthly Limit"]);
       Object.entries(budgets).forEach(([cat, amt]) => {
         budgetSheet.appendRow([cat, amt]);
       });
-      budgetSheet.getRange(1,1,1,2).setFontWeight("bold").setBackground("#f8fafc");
-      if (budgetSheet.getLastRow() > 1) {
-        budgetSheet.getRange(2,2,budgetSheet.getLastRow()-1,1).setNumberFormat("$#,##0");
-      }
     }
 
-    // 3. AGGRESSIVE CLEANUP
-    const sheet1 = ss.getSheetByName("Sheet1");
-    if (sheet1 && ss.getSheets().length > 1) {
-      ss.deleteSheet(sheet1);
-    }
-
-    const allSheets = ss.getSheets();
-    allSheets.forEach(s => {
-      const name = s.getName();
-      if (name.toLowerCase().includes("monthly summary") && !name.includes("20")) {
-        if (ss.getSheets().length > 1) ss.deleteSheet(s);
-      }
-    });
+    // 3. Return the FULL updated state immediately (Atomic Response)
+    const result = { 
+      status: "success",
+      transactions: [], 
+      budgets: {} 
+    };
     
-    return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+    const txRows = txSheet.getDataRange().getValues();
+    for (let i = 1; i < txRows.length; i++) {
+      if (!txRows[i][0]) continue;
+      let splits = [];
+      try { splits = JSON.parse(txRows[i][5]); } catch (e) { splits = [{ categoryName: 'Other', amount: Number(txRows[i][4]) }]; }
+      result.transactions.push({ 
+        id: String(txRows[i][0]), 
+        date: txRows[i][1], 
+        description: txRows[i][2], 
+        userId: txRows[i][3], 
+        totalAmount: Number(txRows[i][4]), 
+        splits: splits 
+      });
+    }
+
+    const bRows = budgetSheet.getDataRange().getValues();
+    for (let j = 1; j < bRows.length; j++) {
+      if (bRows[j][0]) result.budgets[bRows[j][0]] = Number(bRows[j][1]);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function doGet() {
+  // We reuse the same logic for basic refresh
+  return doPost({ postData: { contents: JSON.stringify({ transactions: [], budgets: {} }) } });
 }
 
 function updateYearlySummarySheets(ss, txs) {
@@ -98,10 +121,7 @@ function updateYearlySummarySheets(ss, txs) {
     
     if (!yearMap[year]) yearMap[year] = {};
     if (!userMonthMap[year]) {
-      userMonthMap[year] = {
-        "PARTNER_1": new Array(12).fill(0),
-        "PARTNER_2": new Array(12).fill(0)
-      };
+      userMonthMap[year] = { "PARTNER_1": new Array(12).fill(0), "PARTNER_2": new Array(12).fill(0) };
     }
     
     userMonthMap[year][t.userId][monthIdx] += Number(t.totalAmount) || 0;
@@ -118,28 +138,19 @@ function updateYearlySummarySheets(ss, txs) {
   Object.keys(yearMap).sort().reverse().forEach(year => {
     const sheetName = "Summary " + year;
     let sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-    ss.setActiveSheet(sheet);
-    ss.moveActiveSheet(1);
     sheet.clear();
-    
     const headers = ["Category", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Yearly Total"];
     sheet.appendRow(headers);
     
-    const yearData = yearMap[year];
     catsSorted.forEach(cat => {
-      const monthData = yearData[cat];
-      if (monthData) {
-        const row = [cat, ...monthData, monthData.reduce((a, b) => a + b, 0)];
-        sheet.appendRow(row);
-      }
+      const monthData = yearMap[year][cat];
+      if (monthData) sheet.appendRow([cat, ...monthData, monthData.reduce((a, b) => a + b, 0)]);
     });
 
     const totalRow = ["GRAND TOTAL"];
     for (let m = 0; m < 12; m++) {
       let monthSum = 0;
-      catsSorted.forEach(cat => {
-        if (yearData[cat]) monthSum += yearData[cat][m];
-      });
+      catsSorted.forEach(cat => { if (yearMap[year][cat]) monthSum += yearMap[year][cat][m]; });
       totalRow.push(monthSum);
     }
     totalRow.push(totalRow.slice(1).reduce((a, b) => a + b, 0));
@@ -147,64 +158,15 @@ function updateYearlySummarySheets(ss, txs) {
 
     const tracyPaidRow = ["Tracy Paid (Actual)"];
     const tracyOwesRow = ["Tracy owes"];
-    
-    let yearTracyPaid = 0;
-    let yearTracyOwes = 0;
-
     for (let m = 0; m < 12; m++) {
       const monthTotal = totalRow[m + 1];
       const tracyPaid = userMonthMap[year]["PARTNER_1"][m];
-      const tracyOwes = (monthTotal - tracyPaid) * 0.45;
-      
       tracyPaidRow.push(tracyPaid);
-      tracyOwesRow.push(tracyOwes);
-      
-      yearTracyPaid += tracyPaid;
-      yearTracyOwes += tracyOwes;
+      tracyOwesRow.push((monthTotal - tracyPaid) * 0.45);
     }
-    
-    tracyPaidRow.push(yearTracyPaid);
-    tracyOwesRow.push(yearTracyOwes);
-    
     sheet.appendRow(tracyPaidRow);
     sheet.appendRow(tracyOwesRow);
-
-    const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
-    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#f8fafc");
-    sheet.getRange(lastRow - 2, 1, 1, lastCol).setFontWeight("bold").setBackground("#f1f5f9");
-    sheet.getRange(lastRow - 1, 1, 1, lastCol).setFontStyle("italic").setFontColor("#64748b");
-    sheet.getRange(lastRow, 1, 1, lastCol).setFontWeight("bold").setBackground("#eef2ff").setFontColor("#4f46e5");
-    sheet.getRange(2, 2, lastRow, lastCol).setNumberFormat("$#,##0.00");
-    sheet.setFrozenRows(1);
-    sheet.setFrozenColumns(1);
-    sheet.autoResizeColumns(1, lastCol);
+    sheet.getRange(2, 2, sheet.getLastRow(), sheet.getLastColumn()).setNumberFormat("$#,##0.00");
   });
 }
-
-function doGet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const txSheet = ss.getSheetByName("Transactions");
-  const budgetSheet = ss.getSheetByName("Budgets");
-  
-  const result = { transactions: [], budgets: {} };
-  
-  if (txSheet) {
-    const rows = txSheet.getDataRange().getValues();
-    for (let i = 1; i < rows.length; i++) {
-      if (!rows[i][0]) continue;
-      let splits = [];
-      try { splits = JSON.parse(rows[i][5]); } catch (e) { splits = [{ categoryName: 'Other', amount: Number(rows[i][4]) }]; }
-      result.transactions.push({ id: String(rows[i][0]), date: rows[i][1], description: rows[i][2], userId: rows[i][3], totalAmount: Number(rows[i][4]), splits: splits });
-    }
-  }
-
-  if (budgetSheet) {
-    const bRows = budgetSheet.getDataRange().getValues();
-    for (let j = 1; j < bRows.length; j++) {
-      if (bRows[j][0]) result.budgets[bRows[j][0]] = Number(bRows[j][1]);
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-}`;
+`;

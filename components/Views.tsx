@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
 import { analyzeSpending, parseReceipt, detectSubscriptions, parseVoiceTransaction } from '../services/geminiService';
@@ -42,7 +43,7 @@ export const Dashboard = memo(({
         setLastSync(new Date().toLocaleTimeString());
       }
     } catch (err) {
-      alert("Cloud Sync failed.");
+      alert("Cloud Sync failed. Your local data is safe.");
     } finally {
       setIsSyncing(false);
     }
@@ -66,7 +67,6 @@ export const Dashboard = memo(({
     }
 
     const totalBudget: number = Object.values(budgets).reduce((acc: number, val: number) => acc + (val || 0), 0);
-    // Calculation remains 45% based on requirement, but percentage is NOT displayed.
     const tracyOwesThisMonth: number = (totalCombined - tracyPaidThisMonth) * 0.45;
     const remainingBudget: number = Math.max(0, totalBudget - totalCombined);
     
@@ -77,7 +77,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.7</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.9</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -102,10 +102,6 @@ export const Dashboard = memo(({
                 <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
                   <span>Tracy Paid:</span>
                   <span>${data.tracyPaidThisMonth.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-[9px] font-black uppercase text-indigo-500">
-                  <span>Balance Due:</span>
-                  <span>${data.tracyOwesThisMonth.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -468,7 +464,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.7">
+        <Card title="Script Engine v3.9">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
@@ -482,7 +478,7 @@ export const SettingsView = memo(({
                 setTransactions(d.transactions); 
                 if (d.budgets) setBudgets(d.budgets); 
                 setLastSync(new Date().toLocaleTimeString());
-                alert("Success!");
+                alert("Cloud Sync Successful!");
               }
             } catch (err) { alert("Sync failed."); }
             setIsSyncing(false); 
