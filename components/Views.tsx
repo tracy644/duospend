@@ -77,7 +77,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.9</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.0</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -378,6 +378,20 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
   const [loading, setLoading] = useState(false);
   const [loadingSubs, setLoadingSubs] = useState(false);
 
+  const handleRunAudit = async () => {
+    setLoadingSubs(true);
+    const result = await detectSubscriptions(transactions);
+    setSubs(result ?? "No subscriptions found.");
+    setLoadingSubs(false);
+  };
+
+  const handleRunAdvice = async () => {
+    setLoading(true);
+    const result = await analyzeSpending(transactions, budgets, categories);
+    setAdvice(result);
+    setLoading(false);
+  };
+
   return (
     <div className="space-y-8 animate-in pb-10">
       <header><h1 className="text-4xl font-black text-slate-900 tracking-tight text-center">DuoCoach</h1></header>
@@ -385,7 +399,11 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
       <div className="grid grid-cols-1 gap-6">
         <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl text-center space-y-6">
           <h2 className="text-2xl font-black">Monthly Insight</h2>
-          <button onClick={async () => { setLoading(true); setAdvice(await analyzeSpending(transactions, budgets, categories)); setLoading(false); }} disabled={loading || !isEnabled} className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full">
+          <button 
+            onClick={handleRunAdvice} 
+            disabled={loading || !isEnabled} 
+            className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full"
+          >
             {loading ? 'Thinking...' : 'Analyze My Spending'}
           </button>
           {advice && <div className="bg-white/10 rounded-3xl p-6 text-left text-sm text-white/90 whitespace-pre-wrap leading-relaxed border border-white/5">{advice}</div>}
@@ -400,7 +418,11 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
             <span className="bg-indigo-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">New</span>
           </div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Gemini will audit your history to find hidden recurring subscriptions.</p>
-          <button onClick={async () => { setLoadingSubs(true); setSubs(await detectSubscriptions(transactions)); setLoadingSubs(false); }} disabled={loadingSubs || !isEnabled} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full">
+          <button 
+            onClick={handleRunAudit} 
+            disabled={loadingSubs || !isEnabled} 
+            className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full"
+          >
             {loadingSubs ? 'Scanning History...' : 'Run Subscription Audit'}
           </button>
           {subs && <div className="bg-slate-50 rounded-3xl p-6 text-left text-sm text-slate-600 whitespace-pre-wrap leading-relaxed border border-slate-100 prose prose-sm">{subs}</div>}
@@ -464,7 +486,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.9">
+        <Card title="Script Engine v4.0">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />

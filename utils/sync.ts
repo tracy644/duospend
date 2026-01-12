@@ -40,7 +40,7 @@ export const performSync = async (url: string, transactions: Transaction[], budg
   }
 };
 
-export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v3.8 (Atomic & Safe) **/
+export const GOOGLE_APPS_SCRIPT_CODE = `/** DuoSpend Cloud Sync Script v4.0 (Atomic & Safe) **/
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName("Transactions") || ss.insertSheet("Transactions");
@@ -51,7 +51,7 @@ function doPost(e) {
     const txs = data.transactions;
     const budgets = data.budgets;
     
-    // 1. Update Transactions (Only if provided)
+    // 1. Update Transactions (Only if provided and not empty)
     if (txs && Array.isArray(txs) && txs.length > 0) {
       txSheet.clear();
       txSheet.appendRow(["ID", "Date", "Description", "User", "Total Amount", "SplitsJSON"]);
@@ -77,24 +77,30 @@ function doPost(e) {
       budgets: {} 
     };
     
-    const txRows = txSheet.getDataRange().getValues();
-    for (let i = 1; i < txRows.length; i++) {
-      if (!txRows[i][0]) continue;
-      let splits = [];
-      try { splits = JSON.parse(txRows[i][5]); } catch (e) { splits = [{ categoryName: 'Other', amount: Number(txRows[i][4]) }]; }
-      result.transactions.push({ 
-        id: String(txRows[i][0]), 
-        date: txRows[i][1], 
-        description: txRows[i][2], 
-        userId: txRows[i][3], 
-        totalAmount: Number(txRows[i][4]), 
-        splits: splits 
-      });
+    const txRange = txSheet.getDataRange();
+    if (txRange.getLastRow() > 1) {
+      const txRows = txRange.getValues();
+      for (let i = 1; i < txRows.length; i++) {
+        if (!txRows[i][0]) continue;
+        let splits = [];
+        try { splits = JSON.parse(txRows[i][5]); } catch (e) { splits = [{ categoryName: 'Other', amount: Number(txRows[i][4]) }]; }
+        result.transactions.push({ 
+          id: String(txRows[i][0]), 
+          date: txRows[i][1], 
+          description: txRows[i][2], 
+          userId: txRows[i][3], 
+          totalAmount: Number(txRows[i][4]), 
+          splits: splits 
+        });
+      }
     }
 
-    const bRows = budgetSheet.getDataRange().getValues();
-    for (let j = 1; j < bRows.length; j++) {
-      if (bRows[j][0]) result.budgets[bRows[j][0]] = Number(bRows[j][1]);
+    const bRange = budgetSheet.getDataRange();
+    if (bRange.getLastRow() > 1) {
+      const bRows = bRange.getValues();
+      for (let j = 1; j < bRows.length; j++) {
+        if (bRows[j][0]) result.budgets[bRows[j][0]] = Number(bRows[j][1]);
+      }
     }
     
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -104,7 +110,6 @@ function doPost(e) {
 }
 
 function doGet() {
-  // We reuse the same logic for basic refresh
   return doPost({ postData: { contents: JSON.stringify({ transactions: [], budgets: {} }) } });
 }
 

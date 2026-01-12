@@ -13,7 +13,7 @@ const getAIClient = () => {
   }
 };
 
-export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]) => {
+export const analyzeSpending = async (transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[]): Promise<string> => {
   const ai = getAIClient();
   if (!ai) return "AI Coach is currently offline.";
 
@@ -28,13 +28,13 @@ export const analyzeSpending = async (transactions: Transaction[], budgets: Reco
         systemInstruction: "You are 'DuoCoach', a sharp financial advisor for couples. Provide 3 actionable tips based on their actual spending. Be concise, warm, and use emojis.",
       },
     });
-    return response.text || "No insights found.";
+    return response.text || "No insights found right now.";
   } catch (err) {
     return "Error connecting to AI Coach.";
   }
 };
 
-export const detectSubscriptions = async (transactions: Transaction[]) => {
+export const detectSubscriptions = async (transactions: Transaction[]): Promise<string | null> => {
   const ai = getAIClient();
   if (!ai) return null;
 
@@ -48,7 +48,7 @@ export const detectSubscriptions = async (transactions: Transaction[]) => {
         systemInstruction: "Identify ghost subscriptions (Netflix, Spotify, Gym, etc.). Return a clean markdown list with the merchant name, amount, and why you think it's recurring. If none found, say 'No recurring subscriptions detected.'",
       },
     });
-    return response.text;
+    return response.text ?? "No recurring subscriptions detected.";
   } catch (err) {
     console.error(err);
     return null;
@@ -74,7 +74,9 @@ export const parseReceipt = async (base64Image: string, categories: CategoryDefi
         responseMimeType: "application/json",
       }
     });
-    return JSON.parse(response.text.trim());
+    const text = response.text;
+    if (!text) return null;
+    return JSON.parse(text.trim());
   } catch (error) {
     return null;
   }
@@ -99,7 +101,9 @@ export const parseVoiceTransaction = async (base64Audio: string, categories: Cat
         responseMimeType: "application/json",
       }
     });
-    return JSON.parse(response.text.trim());
+    const text = response.text;
+    if (!text) return null;
+    return JSON.parse(text.trim());
   } catch (error) {
     console.error("Voice parsing error:", error);
     return null;
