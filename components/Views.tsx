@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
 import { analyzeSpending, parseReceipt, detectSubscriptions, parseVoiceTransaction } from '../services/geminiService';
@@ -67,6 +66,7 @@ export const Dashboard = memo(({
     }
 
     const totalBudget: number = Object.values(budgets).reduce((acc: number, val: number) => acc + (val || 0), 0);
+    // Calculation remains 45% based on requirement, but percentage is NOT displayed.
     const tracyOwesThisMonth: number = (totalCombined - tracyPaidThisMonth) * 0.45;
     const remainingBudget: number = Math.max(0, totalBudget - totalCombined);
     
@@ -77,7 +77,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.6</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v3.7</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -176,7 +176,7 @@ export const Dashboard = memo(({
   );
 });
 
-export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: TransactionListProps) => {
+export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: { transactions: Transaction[], categories: CategoryDefinition[], partnerNames: PartnerNames, onAdd: (t: Transaction) => void, onDelete: (id: string) => void, isAIEnabled: boolean }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -298,7 +298,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
             onTouchStart={startRecording}
             onTouchEnd={stopRecording}
             disabled={isParsing || !isAIEnabled}
-            className={`col-span-2 bg-indigo-50 border border-indigo-100 text-indigo-600 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:bg-indigo-600 active:text-white transition-all ${isRecording ? 'animate-pulse bg-indigo-600 text-white scale-95 shadow-inner' : ''}`}
+            className={`col-span-2 bg-indigo-50 border border-indigo-100 text-indigo-600 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:bg-indigo-600 active:text-white transition-all ${isRecording ? 'pulse-indigo bg-indigo-600 text-white scale-95 shadow-inner' : ''}`}
           >
             {isRecording ? '🎤 Listening...' : '🎙️ Hold to Speak Expense'}
           </button>
@@ -376,7 +376,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   );
 });
 
-export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }: AIAdvisorProps) => {
+export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }: { transactions: Transaction[], budgets: Record<string, number>, categories: CategoryDefinition[], isEnabled: boolean }) => {
   const [advice, setAdvice] = useState<string | null>(null);
   const [subs, setSubs] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -396,9 +396,12 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
         </div>
 
         <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-xl space-y-6">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">👻</span>
-            <h2 className="text-xl font-black text-slate-900">Ghost Detector</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">👻</span>
+              <h2 className="text-xl font-black text-slate-900">Ghost Detector</h2>
+            </div>
+            <span className="bg-indigo-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">New</span>
           </div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Gemini will audit your history to find hidden recurring subscriptions.</p>
           <button onClick={async () => { setLoadingSubs(true); setSubs(await detectSubscriptions(transactions)); setLoadingSubs(false); }} disabled={loadingSubs || !isEnabled} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest w-full">
@@ -411,38 +414,9 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
   );
 });
 
-interface TransactionListProps {
-  transactions: Transaction[];
-  categories: CategoryDefinition[];
-  partnerNames: PartnerNames;
-  onAdd: (t: Transaction) => void;
-  onDelete: (id: string) => void;
-  isAIEnabled: boolean;
-}
-
-interface AIAdvisorProps {
-  transactions: Transaction[];
-  budgets: Record<string, number>;
-  categories: CategoryDefinition[];
-  isEnabled: boolean;
-}
-
-interface SettingsViewProps {
-  partnerNames: PartnerNames;
-  budgets: Record<string, number>;
-  setBudgets: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-  categories: CategoryDefinition[];
-  syncUrl: string;
-  setSyncUrl: (url: string) => void;
-  lastSync: string;
-  setLastSync: (time: string) => void;
-  transactions: Transaction[];
-  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
-}
-
 export const SettingsView = memo(({ 
   partnerNames, budgets, setBudgets, categories, syncUrl, setSyncUrl, lastSync, setLastSync, transactions, setTransactions 
-}: SettingsViewProps) => {
+}: { partnerNames: PartnerNames, budgets: Record<string, number>, setBudgets: React.Dispatch<React.SetStateAction<Record<string, number>>>, categories: CategoryDefinition[], syncUrl: string, setSyncUrl: (url: string) => void, lastSync: string, setLastSync: (time: string) => void, transactions: Transaction[], setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>> }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -494,7 +468,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v3.6">
+        <Card title="Script Engine v3.7">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
