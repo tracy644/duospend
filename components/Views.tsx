@@ -76,7 +76,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.5</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.6</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -437,7 +437,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v4.5">
+        <Card title="Script Engine v4.6">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
@@ -462,7 +462,7 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-6 pt-4 text-center">
-        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.5)</button>
+        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.6)</button>
         <button onClick={handleClearTransactions} className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-4">🗑️ Wipe Local Data</button>
       </section>
     </div>
