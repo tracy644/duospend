@@ -76,7 +76,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.7</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.8</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -419,6 +419,26 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-4">
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">AI Coach Activation</h2>
+        <Card title="Step-by-Step Guide">
+           <div className="space-y-4 text-xs font-medium text-slate-600 leading-relaxed">
+             <div className="flex gap-3">
+               <span className="bg-slate-900 text-white w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black">1</span>
+               <p>Go to <a href="https://aistudio.google.com/" target="_blank" className="text-indigo-600 font-bold underline">Google AI Studio</a>. Pick <strong>ANY</strong> project from your list (the name doesn't matter, just pick the newest one). Generate an <strong>API Key</strong>.</p>
+             </div>
+             <div className="flex gap-3">
+               <span className="bg-slate-900 text-white w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black">2</span>
+               <p>Open your <strong>Vercel Dashboard</strong>. Go to <strong>Settings > Environment Variables</strong>. Add a new variable called <code className="bg-slate-100 px-1 font-black">API_KEY</code> and paste your key there.</p>
+             </div>
+             <div className="flex gap-3">
+               <span className="bg-slate-900 text-white w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black">3</span>
+               <p><strong>Crucial:</strong> Go to the "Deployments" tab in Vercel and click the three dots on your latest build. Select <strong>Redeploy</strong>. The Coach won't work until you redeploy!</p>
+             </div>
+           </div>
+        </Card>
+      </section>
+
+      <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Budgets</h2>
         <Card title="Adjust Limits">
           <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar py-2">
@@ -438,7 +458,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v4.7">
+        <Card title="Script Engine v4.8">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
@@ -463,7 +483,7 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-6 pt-4 text-center">
-        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.7)</button>
+        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.8)</button>
         <button onClick={handleClearTransactions} className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-4">🗑️ Wipe Local Data</button>
       </section>
     </div>
