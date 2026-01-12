@@ -1,6 +1,6 @@
 import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { Transaction, CategoryDefinition, UserRole, PartnerNames, Goal, TransactionSplit } from '../types';
-import { analyzeSpending, parseReceipt, detectSubscriptions, parseVoiceTransaction } from '../services/geminiService';
+import { analyzeSpending, detectSubscriptions } from '../services/geminiService';
 import { Card, ProgressBar } from './UI';
 import { GOOGLE_APPS_SCRIPT_CODE, performSync } from '../utils/sync';
 
@@ -76,7 +76,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.1</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.3</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -173,17 +173,11 @@ export const Dashboard = memo(({
 
 export const TransactionList = memo(({ transactions, categories, partnerNames, onAdd, onDelete, isAIEnabled }: { transactions: Transaction[], categories: CategoryDefinition[], partnerNames: PartnerNames, onAdd: (t: Transaction) => void, onDelete: (id: string) => void, isAIEnabled: boolean }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [newUser, setNewUser] = useState(UserRole.PARTNER_1);
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newSplits, setNewSplits] = useState<TransactionSplit[]>([{ categoryName: categories[0]?.name || '', amount: 0 }]);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-
   const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [newSplits]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -204,71 +198,11 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   const resetForm = () => {
     setNewDesc('');
     setNewSplits([{ categoryName: categories[0]?.name || '', amount: 0 }]);
-  };
-
-  const handleScanClick = () => fileInputRef.current?.click();
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsParsing(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1];
-      const result = await parseReceipt(base64, categories);
-      if (result) {
-        setNewDesc(result.description);
-        setNewSplits([{ categoryName: result.categoryName || categories[0].name, amount: result.amount }]);
-        setIsModalOpen(true);
-      } else {
-        alert("Parsing failed.");
-      }
-      setIsParsing(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const reader = new FileReader();
-        reader.onload = async () => {
-          setIsParsing(true);
-          const base64 = (reader.result as string).split(',')[1];
-          const result = await parseVoiceTransaction(base64, categories);
-          if (result) {
-            setNewDesc(result.description);
-            setNewSplits([{ categoryName: result.categoryName || categories[0].name, amount: result.amount }]);
-            setIsModalOpen(true);
-          } else {
-            alert("Could not understand voice note.");
-          }
-          setIsParsing(false);
-        };
-        reader.readAsDataURL(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-      recorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      alert("Microphone access denied.");
-    }
-  };
-
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
+    setNewDate(new Date().toISOString().split('T')[0]);
   };
 
   const groups = useMemo(() => {
-    const sorted = [...transactions].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 30);
+    const sorted = [...transactions].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 50);
     const g: Record<string, Transaction[]> = {};
     sorted.forEach(t => {
       const d = new Date(t.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
@@ -282,27 +216,20 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
     <div className="space-y-8 animate-in pb-10">
       <header className="flex flex-col gap-4 pt-4">
         <h1 className="text-4xl font-black text-slate-900 tracking-tight">Timeline</h1>
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">Log Entry</button>
-          <button onClick={handleScanClick} disabled={isParsing || !isAIEnabled} className={`bg-white border border-slate-200 text-slate-900 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isParsing ? 'opacity-50' : ''}`}>
-            {isParsing ? <div className="w-4 h-4 border-2 border-slate-900/20 border-t-slate-900 rounded-full animate-spin" /> : '📷 Scan'}
-          </button>
-          <button 
-            onMouseDown={startRecording} 
-            onMouseUp={stopRecording}
-            onTouchStart={startRecording}
-            onTouchEnd={stopRecording}
-            disabled={isParsing || !isAIEnabled}
-            className={`col-span-2 bg-indigo-50 border border-indigo-100 text-indigo-600 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:bg-indigo-600 active:text-white transition-all ${isRecording ? 'pulse-indigo bg-indigo-600 text-white scale-95 shadow-inner' : ''}`}
-          >
-            {isRecording ? '🎤 Listening...' : '🎙️ Hold to Speak Expense'}
-          </button>
-        </div>
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" capture="environment" className="hidden" />
+        <button 
+          onClick={() => setIsModalOpen(true)} 
+          className="w-full bg-slate-900 text-white px-6 py-6 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+        >
+          <span className="text-xl">+</span> Add New Expense
+        </button>
       </header>
       
       <div className="space-y-10">
-        {groups.map(([date, txs]) => (
+        {groups.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-[40px] border border-dashed border-slate-200">
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No entries found</p>
+          </div>
+        ) : groups.map(([date, txs]) => (
           <div key={date} className="space-y-4">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{date}</h3>
             {txs.map((t: Transaction) => (
@@ -311,12 +238,12 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
                   <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">{categories.find((c: CategoryDefinition) => c.name === t.splits[0]?.categoryName)?.icon || '💰'}</div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{t.description}</h4>
-                    <p className="text-[10px] font-black text-slate-400 uppercase">{partnerNames[t.userId]} • {t.splits.length} {t.splits.length === 1 ? 'category' : 'categories'}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">{partnerNames[t.userId]}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-lg font-black text-slate-900">${t.totalAmount.toFixed(2)}</span>
-                  <button onClick={() => onDelete(t.id)} className="text-slate-100 hover:text-rose-400 p-1">×</button>
+                  <button onClick={() => onDelete(t.id)} className="text-slate-100 hover:text-rose-400 p-1 font-bold text-xl">×</button>
                 </div>
               </div>
             ))}
@@ -329,10 +256,10 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
           <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl animate-in max-h-[90vh] overflow-y-auto no-scrollbar">
             <div className="flex justify-between items-start mb-6">
               <h2 className="text-2xl font-black tracking-tight">New Log</h2>
-              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-slate-300 hover:text-slate-500 font-bold">Close</button>
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-slate-300 hover:text-slate-500 font-bold text-lg">×</button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none" placeholder="Store Name" />
+              <input required value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none" placeholder="Description / Merchant" />
               <div className="grid grid-cols-2 gap-3">
                 <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} required className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none" />
                 <select value={newUser} onChange={e => setNewUser(e.target.value as UserRole)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold outline-none">
@@ -362,7 +289,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
                 <span className="text-[10px] font-black uppercase opacity-50">Total</span>
                 <span className="text-3xl font-black">${totalAmount.toFixed(2)}</span>
               </div>
-              <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase text-[12px] tracking-widest shadow-xl">Save Transaction</button>
+              <button type="submit" className="w-full bg-indigo-600 text-white py-5 rounded-[24px] font-black uppercase text-[12px] tracking-widest shadow-xl active:scale-[0.98] transition-all">Save Transaction</button>
             </form>
           </div>
         </div>
@@ -414,7 +341,7 @@ export const AIAdvisor = memo(({ transactions, budgets, categories, isEnabled }:
               <span className="text-2xl">👻</span>
               <h2 className="text-xl font-black text-slate-900">Ghost Detector</h2>
             </div>
-            <span className="bg-indigo-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">New</span>
+            <span className="bg-indigo-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">History Audit</span>
           </div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Gemini will audit your history to find hidden recurring subscriptions.</p>
           <button 
@@ -468,7 +395,6 @@ export const SettingsView = memo(({
         }
       }
       localStorage.removeItem('ds_app_version');
-      // Fix: window.location.reload() expects no arguments in modern browser types
       window.location.reload();
     }
   };
@@ -505,7 +431,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v4.1">
+        <Card title="Script Engine v4.3">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
@@ -530,7 +456,7 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-6 pt-4 text-center">
-        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (Clear Cache)</button>
+        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.3)</button>
         <button onClick={handleClearTransactions} className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-4">🗑️ Wipe Local Data</button>
       </section>
     </div>

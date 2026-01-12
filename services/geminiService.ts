@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { Transaction, CategoryDefinition } from "../types";
 
 const getAIClient = () => {
@@ -51,61 +50,6 @@ export const detectSubscriptions = async (transactions: Transaction[]): Promise<
     return response.text ?? "No recurring subscriptions detected.";
   } catch (err) {
     console.error(err);
-    return null;
-  }
-};
-
-export const parseReceipt = async (base64Image: string, categories: CategoryDefinition[]): Promise<{amount: number, description: string, categoryName: string} | null> => {
-  const ai = getAIClient();
-  if (!ai) return null;
-  const catList = categories.map(c => c.name).join(', ');
-  
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: {
-        parts: [
-          { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-          { text: "Extract receipt details." }
-        ]
-      },
-      config: {
-        systemInstruction: `Extract total, store, and category. Return ONLY JSON: { "amount": number, "description": string, "categoryName": string }. Available Categories: [${catList}].`,
-        responseMimeType: "application/json",
-      }
-    });
-    const text = response.text;
-    if (!text) return null;
-    return JSON.parse(text.trim());
-  } catch (error) {
-    return null;
-  }
-};
-
-export const parseVoiceTransaction = async (base64Audio: string, categories: CategoryDefinition[]) => {
-  const ai = getAIClient();
-  if (!ai) return null;
-  const catList = categories.map(c => c.name).join(', ');
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-      contents: {
-        parts: [
-          { inlineData: { data: base64Audio, mimeType: 'audio/wav' } },
-          { text: "The user is describing a transaction. Extract the details." }
-        ]
-      },
-      config: {
-        systemInstruction: `Extract description, amount, and category from the audio. Return ONLY JSON: { "amount": number, "description": string, "categoryName": string }. Categories: [${catList}]. If category is unclear, pick the closest one.`,
-        responseMimeType: "application/json",
-      }
-    });
-    const text = response.text;
-    if (!text) return null;
-    return JSON.parse(text.trim());
-  } catch (error) {
-    console.error("Voice parsing error:", error);
     return null;
   }
 };

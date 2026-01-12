@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <!-- DuoSpend v4.1 Build -->
+  <!-- DuoSpend v4.3 Build - Rock Solid Edition -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DuoSpend">
   <meta name="theme-color" content="#f8fafc">
   
-  <!-- Cache Control Meta Tags -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <!-- Aggressive Cache Control -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <title>DuoSpend v4.1</title>
+  <title>DuoSpend v4.3</title>
   
   <!-- Manifest for "Add to Home Screen" -->
   <link rel="manifest" href="manifest.json">
@@ -54,28 +54,34 @@
     .safe-top {
       padding-top: env(safe-area-inset-top);
     }
-    .pulse-indigo {
-      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
-    }
   </style>
 
-  <!-- Auto-Refresh logic for caching -->
+  <!-- Nuclear Cache Buster & Version Sync -->
   <script>
     (function() {
-      const CURRENT_VERSION = '4.1';
-      const storedVersion = localStorage.getItem('ds_app_version');
-      if (storedVersion !== CURRENT_VERSION) {
-        localStorage.setItem('ds_app_version', CURRENT_VERSION);
-        if (storedVersion) {
-          // Version changed, force a clean reload
-          console.log('New version detected, refreshing cache...');
-          window.location.reload(true);
+      const TARGET_VERSION = '4.3';
+      const lastVersion = localStorage.getItem('ds_app_version');
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('Unregistered stale Service Worker');
+          }
+        });
+      }
+
+      if (lastVersion !== TARGET_VERSION) {
+        localStorage.setItem('ds_app_version', TARGET_VERSION);
+        if (lastVersion) {
+          if ('caches' in window) {
+            caches.keys().then(names => {
+              for (let name of names) caches.delete(name);
+            });
+          }
+          setTimeout(() => {
+            window.location.replace(window.location.href.split('#')[0] + '?v=' + Date.now());
+          }, 100);
         }
       }
     })();
@@ -95,8 +101,8 @@
 }
 </script>
 </head>
-<body class="safe-top" data-app-version="4.1">
+<body class="safe-top" data-app-version="4.3">
   <div id="root"></div>
-  <script type="module" src="index.tsx"></script>
+  <script type="module" src="index.tsx?v=4.3"></script>
 </body>
 </html>
