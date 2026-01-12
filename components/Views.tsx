@@ -76,7 +76,7 @@ export const Dashboard = memo(({
     <div className="space-y-8 animate-in pb-10">
       <header className="pt-4 flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.3</p>
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">DuoSpend Live v4.4</p>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Overview.</h1>
         </div>
         <div className="text-right">
@@ -178,7 +178,7 @@ export const TransactionList = memo(({ transactions, categories, partnerNames, o
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newSplits, setNewSplits] = useState<TransactionSplit[]>([{ categoryName: categories[0]?.name || '', amount: 0 }]);
   
-  const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [newSplits]);
+  const totalAmount = useMemo(() => newSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), [newSplits]), [newSplits]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,20 +382,26 @@ export const SettingsView = memo(({
 
   const handleForceRefresh = async () => {
     if (confirm("This will force the app to refresh and pull the latest code. Your data is safe in the cloud. Continue?")) {
+      // 1. Unregister all service workers
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
           await registration.unregister();
         }
       }
+      // 2. Clear all browser caches
       if (window.caches) {
         const cacheNames = await caches.keys();
         for (const name of cacheNames) {
           await caches.delete(name);
         }
       }
+      // 3. Clear storage but keep the important stuff (transactions/sync URL)
       localStorage.removeItem('ds_app_version');
-      window.location.reload();
+      sessionStorage.clear();
+      
+      // 4. Force hard reload with cache buster
+      window.location.replace(window.location.href.split('?')[0] + '?r=' + Date.now());
     }
   };
 
@@ -431,7 +437,7 @@ export const SettingsView = memo(({
 
       <section className="space-y-4">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cloud Connection</h2>
-        <Card title="Script Engine v4.3">
+        <Card title="Script Engine v4.4">
           <button onClick={handleCopy} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-900'}`}>{copied ? '✅ Code Copied!' : '📋 Copy Script Code'}</button>
           <div className="space-y-2 mt-6">
             <input value={syncUrl} onChange={e => setSyncUrl(e.target.value)} className={`w-full px-4 py-4 rounded-xl outline-none font-bold text-sm ${syncUrl.includes('exec') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`} placeholder="Paste the NEW Web App URL here..." />
@@ -456,7 +462,7 @@ export const SettingsView = memo(({
       </section>
 
       <section className="space-y-6 pt-4 text-center">
-        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.3)</button>
+        <button onClick={handleForceRefresh} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-slate-100">🚀 Force App Update (v4.4)</button>
         <button onClick={handleClearTransactions} className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-4">🗑️ Wipe Local Data</button>
       </section>
     </div>
