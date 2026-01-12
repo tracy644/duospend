@@ -3,14 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <!-- DuoSpend v4.0 Build -->
+  <!-- DuoSpend v4.1 Build -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DuoSpend">
   <meta name="theme-color" content="#f8fafc">
   
-  <title>DuoSpend v4.0</title>
+  <!-- Cache Control Meta Tags -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <title>DuoSpend v4.1</title>
   
   <!-- Manifest for "Add to Home Screen" -->
   <link rel="manifest" href="manifest.json">
@@ -59,6 +64,23 @@
       100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
     }
   </style>
+
+  <!-- Auto-Refresh logic for caching -->
+  <script>
+    (function() {
+      const CURRENT_VERSION = '4.1';
+      const storedVersion = localStorage.getItem('ds_app_version');
+      if (storedVersion !== CURRENT_VERSION) {
+        localStorage.setItem('ds_app_version', CURRENT_VERSION);
+        if (storedVersion) {
+          // Version changed, force a clean reload
+          console.log('New version detected, refreshing cache...');
+          window.location.reload(true);
+        }
+      }
+    })();
+  </script>
+
 <script type="importmap">
 {
   "imports": {
@@ -73,7 +95,7 @@
 }
 </script>
 </head>
-<body class="safe-top" data-app-version="4.0">
+<body class="safe-top" data-app-version="4.1">
   <div id="root"></div>
   <script type="module" src="index.tsx"></script>
 </body>
